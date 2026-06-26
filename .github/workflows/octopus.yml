@@ -1,0 +1,37 @@
+name: Run Octopus2 Network Check
+
+on:
+  workflow_dispatch: # Te permet de lancer le bot d'un simple clic depuis ton téléphone
+  schedule:
+    - cron: '0 * * * *' # S'exécute automatiquement toutes les heures en tâche de fond
+
+jobs:
+  run-octopus:
+    runs-on: ubuntu-latest
+    steps:
+    - name: 1. Récupération du code source
+      uses: actions/checkout@v3
+
+    - name: 2. Configuration de l'environnement Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    - name: 3. Installation des modules requis
+      run: pip install requests
+
+    - name: 4. Exécution du moteur Octopus2
+      env:
+        IP_CIBLE: ${{ secrets.MOVITEL_IP }} # Injecte ton IP secrète
+      run: python octopus_bot.py
+
+    - name: 5. Enregistrement automatique des données sur ton GitHub
+      env:
+        GITHUB_TOKEN: ${{ secrets.GH_TOKEN }} # Utilise ton token secret pour valider les changements
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action Bot"
+        git add octopus_essentiel.json
+        git commit -m "🐙 Octopus2 : Nouvelle capture de données Movitel [Skip CI]" || exit 0
+        git push origin HEAD
+        
