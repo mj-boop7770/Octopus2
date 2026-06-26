@@ -1,9 +1,9 @@
 name: Run Octopus2 Network Check
 
 on:
-  workflow_dispatch: # Te permet de lancer le bot d'un simple clic depuis ton téléphone
+  workflow_dispatch: # Permet le déclenchement manuel depuis ton téléphone
   schedule:
-    - cron: '0 * * * *' # S'exécute automatiquement toutes les heures en tâche de fond
+    - cron: '0 * * * *' # S'exécute automatiquement toutes les heures
 
 jobs:
   run-octopus:
@@ -22,12 +22,15 @@ jobs:
 
     - name: 4. Exécution du moteur Octopus2
       env:
-        IP_CIBLE: ${{ secrets.MOVITEL_IP }} # Injecte ton IP secrète
+        # Liaison directe avec tes clés cachées dans la section Secrets
+        IP_CIBLE: ${{ secrets.MOVITEL_IP }}
+        MON_API_TOKEN: ${{ secrets.GH_TOKEN }}
       run: python octopus_bot.py
 
     - name: 5. Enregistrement automatique des données sur ton GitHub
       env:
-        GITHUB_TOKEN: ${{ secrets.GH_TOKEN }} # Utilise ton token secret pour valider les changements
+        # Authentification forcée avec ton token secret pour le push
+        GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action Bot"
