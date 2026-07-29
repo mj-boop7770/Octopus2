@@ -3,7 +3,6 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Méthode non autorisée' });
   }
 
-  // Récupération de l'historique de conversation
   const { messages, mode } = req.body;
 
   if (!messages || !Array.isArray(messages) || messages.length === 0) {
@@ -15,7 +14,6 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Clé GROQ_API_KEY manquante dans Vercel' });
   }
 
-  // 1. Définition du comportement de l'IA (System Prompt)
   let systemContent = "Tu es Octopus AI, un assistant virtuel intelligent, rapide et concis.";
 
   if (mode === 'code') {
@@ -30,23 +28,22 @@ export default async function handler(req, res) {
 
   const systemMessage = { role: 'system', content: systemContent };
 
-  // 2. Formatage des messages pour l'API
   const formattedMessages = messages.map(m => ({
     role: m.role === 'bot' || m.role === 'assistant' ? 'assistant' : 'user',
     content: m.content
   }));
 
-  // On garde les 8 derniers messages (bon équilibre mémoire / consommation de tokens)
+  // On garde les 8 derniers messages pour économiser les tokens
   const recentMessages = formattedMessages.slice(-8);
 
-  // 3. Modèles de secours classés par ordre de priorité
+  // Les 4 modèles actifs en cascade (si l'un sature ou rate, on passe au suivant)
   const models = [
-    'llama-3.3-70b-versatile', // Modèle principal (Le plus puissant)
-    'llama-3.1-8b-instant',    // Secours 1 (Ultra rapide)
-    'mixtral-8x7b-32768'       // Secours 2 (Très performant)
+    'llama-3.3-70b-versatile',
+    'openai/gpt-oss-120b',
+    'llama-3.1-8b-instant',
+    'openai/gpt-oss-20b'
   ];
 
-  // 4. Boucle de bascule automatique si une erreur 429 (Rate Limit) survient
   for (const model of models) {
     try {
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -65,17 +62,15 @@ export default async function handler(req, res) {
 
       const data = await response.json();
 
-      // Si le modèle répond correctement, on renvoie le résultat
       if (response.ok && data.choices?.[0]?.message?.content) {
         return res.status(200).json({ reply: data.choices[0].message.content });
       }
 
-      // Si le quota/rate limit est atteint (Code HTTP 429), on passe au modèle suivant
-      if (response.status === 429) {
-        console.warn(`[Octopus AI] Rate limit atteint pour ${model}. Bascule sur le modèle suivant...`);
+      // Si le modèle est surchargé ou atteint sa limite (Rate limit / Erreur), on bascule sur le suivant
+      if (response.status === 429 || response.status === 400 || response.status === 404) {
+        console.warn(`[Octopus AI] Modèle ${model} indisponible (${response.status}), essai du suivant...`);
         continue;
       } else {
-        // En cas d'autre erreur API, on la remonte
         return res.status(500).json({ error: data.error?.message || 'Erreur API Groq' });
       }
 
@@ -84,9 +79,7 @@ export default async function handler(req, res) {
     }
   }
 
-  // Si tous les modèles ont épuisé leur limite journalière
   return res.status(429).json({ 
-    error: "Tous les modèles de secours ont atteint leur limite journalière. Prends une courte pause ou réessaie plus tard !" 
+    error: "Tous les modèles de secours ont atteint leur limite ou sont indisponibles. Réessaie un peu plus tard !" 
   });
-      }
-    
+          }
