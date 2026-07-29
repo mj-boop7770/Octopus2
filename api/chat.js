@@ -33,15 +33,14 @@ export default async function handler(req, res) {
     content: m.content
   }));
 
-  // On garde les 8 derniers messages pour économiser les tokens
-  const recentMessages = formattedMessages.slice(-8);
+  // On réduit à 4 messages récents pour éviter de dépasser la limite de TPM (Tokens Par Minute)
+  const recentMessages = formattedMessages.slice(-4);
 
-  // Les 4 modèles actifs en cascade (si l'un sature ou rate, on passe au suivant)
+  // Modèles officiels et stables sur Groq avec de très grosses limites de tokens
   const models = [
     'llama-3.3-70b-versatile',
-    'openai/gpt-oss-120b',
     'llama-3.1-8b-instant',
-    'openai/gpt-oss-20b'
+    'gemma2-9b-it'
   ];
 
   for (const model of models) {
@@ -66,9 +65,12 @@ export default async function handler(req, res) {
         return res.status(200).json({ reply: data.choices[0].message.content });
       }
 
-      // Si le modèle est surchargé ou atteint sa limite (Rate limit / Erreur), on bascule sur le suivant
-      if (response.status === 429 || response.status === 400 || response.status === 404) {
-        console.warn(`[Octopus AI] Modèle ${model} indisponible (${response.status}), essai du suivant...`);
+      // Codes d'erreurs à ignorer et basculer instantanément :
+      // 429 = Rate Limit / TPM / TPD
+      // 413 = Request Too Large (Requête trop lourde)
+      // 400 / 404 = Modèle indisponible ou erreur de syntaxe
+      if ([429, 413, 400, 404].includes(response.status)) {
+        console.warn(`[Octopus AI] Modèle ${model} a renvoyé l'erreur ${response.status}. Bascule en cours...`);
         continue;
       } else {
         return res.status(500).json({ error: data.error?.message || 'Erreur API Groq' });
@@ -80,6 +82,6 @@ export default async function handler(req, res) {
   }
 
   return res.status(429).json({ 
-    error: "Tous les modèles de secours ont atteint leur limite ou sont indisponibles. Réessaie un peu plus tard !" 
+    error: "La demande est trop volumineuse ou tous les modèles sont occupés. Essaie d'ouvrir une nouvelle discussion !" 
   });
-          }
+  }
