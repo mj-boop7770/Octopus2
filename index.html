@@ -6,41 +6,99 @@
   <title>Octopus AI</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
   <style>
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     #chat-box::-webkit-scrollbar { width: 4px; }
     #chat-box::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 9999px; }
   </style>
 </head>
 <body class="bg-[#030712] text-slate-100 font-sans h-[100dvh] w-screen flex flex-col overflow-hidden">
 
+  <!-- OVERLAY SIDEBAR MOBILE -->
+  <div id="sidebar-overlay" class="fixed inset-0 bg-black/60 z-40 hidden backdrop-blur-sm"></div>
+
+  <!-- SIDEBAR HISTORIQUE -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-72 bg-[#090d16] border-r border-slate-800/80 p-4 z-50 transform -translate-x-full transition-transform duration-300 flex flex-col justify-between shadow-2xl">
+    <div>
+      <div class="flex justify-between items-center mb-6 border-b border-slate-800/80 pb-3">
+        <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+          <span>🐙</span> Octopus AI
+        </h2>
+        <button id="close-sidebar-btn" class="text-slate-400 hover:text-white text-xl p-1">✕</button>
+      </div>
+
+      <button id="new-chat-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 mb-6 shadow-lg shadow-indigo-600/20 transition active:scale-[0.98]">
+        <span class="text-lg">+</span> Nouvelle discussion
+      </button>
+
+      <div class="space-y-2">
+        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider px-1">Historique</p>
+        <div id="history-list" class="space-y-1 max-h-[55vh] overflow-y-auto pr-1"></div>
+      </div>
+    </div>
+
+    <div class="text-xs text-slate-500 text-center border-t border-slate-800/80 pt-3">
+      Octopus AI v2.0
+    </div>
+  </aside>
+
   <!-- HEADER -->
-  <header class="bg-[#090d16] border-b border-slate-800 p-4 flex-none flex items-center justify-between shadow-md">
+  <header class="bg-[#090d16] border-b border-slate-800/80 px-4 py-3 flex-none flex items-center justify-between shadow-md z-10">
+    <div class="flex items-center gap-3">
+      <button id="open-sidebar-btn" class="p-2 rounded-xl bg-slate-900 border border-slate-800 text-indigo-400 hover:bg-slate-800 transition focus:outline-none">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+        </svg>
+      </button>
+      <div class="flex items-center gap-2">
+        <span class="text-2xl">🐙</span>
+        <h1 class="font-bold text-lg text-slate-100 tracking-wide">Octopus <span class="text-indigo-400">AI</span></h1>
+      </div>
+    </div>
+
     <div class="flex items-center gap-2">
-      <span class="text-2xl">🐙</span>
-      <h1 class="font-bold text-lg text-slate-100">Octopus <span class="text-indigo-400">AI</span></h1>
+      <select id="mode-select" class="bg-slate-900 border border-slate-800 text-indigo-300 text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none">
+        <option value="general">🌐 Général</option>
+        <option value="code">💻 Code & Dev</option>
+        <option value="writing">✍️ Rédaction</option>
+      </select>
     </div>
   </header>
 
   <!-- ZONE DE CHAT -->
-  <main id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-4">
-    <div class="p-4 bg-slate-900 border border-slate-800 rounded-2xl text-slate-300 text-sm">
-      👋 <b>Bienvenue sur Octopus AI !</b><br>Pose ta question ci-dessous pour démarrer.
-    </div>
-  </main>
+  <main id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-4"></main>
 
-  <!-- FORMULAIRE DE SAISIE FIXE EN BAS -->
-  <footer class="bg-[#090d16] border-t border-slate-800 p-3 flex-none z-10">
-    <form id="chat-form" class="max-w-4xl mx-auto flex items-center gap-2 bg-[#030712] border border-indigo-900/50 rounded-2xl p-2">
+  <!-- FOOTER ET SAISIE -->
+  <footer class="bg-[#090d16] border-t border-slate-800/80 p-3 space-y-3 flex-none z-10">
+    
+    <!-- RACCOURCIS SLIDABLES -->
+    <div class="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs">
+      <button class="shortcut-btn shrink-0 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 px-3 py-1.5 rounded-xl transition" data-prompt="Trouve et corrige le bug dans ce code :">
+        🐛 Débugger
+      </button>
+      <button class="shortcut-btn shrink-0 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 px-3 py-1.5 rounded-xl transition" data-prompt="Optimise ce code pour le rendre plus rapide :">
+        🚀 Optimiser
+      </button>
+      <button class="shortcut-btn shrink-0 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 px-3 py-1.5 rounded-xl transition" data-prompt="Explique-moi ce code en détail :">
+        📝 Expliquer
+      </button>
+    </div>
+
+    <!-- CHAMP SAISIE -->
+    <form id="chat-form" class="max-w-4xl mx-auto flex items-center gap-2 bg-[#030712] border border-indigo-900/40 rounded-2xl p-2 focus-within:border-indigo-500 transition shadow-lg">
       <input 
         type="text" 
         id="user-input" 
-        placeholder="Pose une question..." 
+        placeholder="Pose une question ou colle du code..." 
         autocomplete="off"
         class="flex-1 bg-transparent text-slate-100 placeholder-slate-500 text-sm focus:outline-none px-2"
       />
       <button 
         type="submit" 
-        class="bg-indigo-600 hover:bg-indigo-500 text-white p-2.5 rounded-xl transition shrink-0 font-bold"
+        class="bg-indigo-600 hover:bg-indigo-500 text-white p-2.5 rounded-xl transition shrink-0 font-bold active:scale-95"
       >
         ➔
       </button>
@@ -48,18 +106,131 @@
   </footer>
 
   <script>
+    // ÉLÉMENTS DOM
     const chatBox = document.getElementById('chat-box');
     const chatForm = document.getElementById('chat-form');
     const userInput = document.getElementById('user-input');
+    const modeSelect = document.getElementById('mode-select');
+    
+    const sidebar = document.getElementById('sidebar');
+    const sidebarOverlay = document.getElementById('sidebar-overlay');
+    const openSidebarBtn = document.getElementById('open-sidebar-btn');
+    const closeSidebarBtn = document.getElementById('close-sidebar-btn');
+    const newChatBtn = document.getElementById('new-chat-btn');
+    const historyList = document.getElementById('history-list');
 
-    function appendMessage(sender, text) {
+    // GESTION DU STORAGE & SESSIONS
+    let sessions = [];
+    try {
+      const saved = localStorage.getItem('octopus_sessions');
+      sessions = saved ? JSON.parse(saved) : [];
+      if (!Array.isArray(sessions)) sessions = [];
+    } catch(e) { sessions = []; }
+
+    let currentSessionId = localStorage.getItem('octopus_current_session') || null;
+
+    function saveToStorage() {
+      localStorage.setItem('octopus_sessions', JSON.stringify(sessions));
+      localStorage.setItem('octopus_current_session', currentSessionId || '');
+    }
+
+    function getCurrentSession() {
+      return sessions.find(s => s.id === currentSessionId);
+    }
+
+    function createNewSession() {
+      const newSession = {
+        id: Date.now().toString(),
+        title: 'Nouvelle discussion',
+        messages: []
+      };
+      sessions.unshift(newSession);
+      currentSessionId = newSession.id;
+      saveToStorage();
+      renderHistoryList();
+      renderCurrentSession();
+      closeSidebar();
+    }
+
+    function deleteSession(id, e) {
+      e.stopPropagation();
+      sessions = sessions.filter(s => s.id !== id);
+      if (currentSessionId === id) {
+        currentSessionId = sessions.length > 0 ? sessions[0].id : null;
+      }
+      saveToStorage();
+      renderHistoryList();
+      renderCurrentSession();
+    }
+
+    // SIDEBAR TOGGLE
+    function openSidebar() {
+      sidebar.classList.remove('-translate-x-full');
+      sidebarOverlay.classList.remove('hidden');
+    }
+    function closeSidebar() {
+      sidebar.classList.add('-translate-x-full');
+      sidebarOverlay.classList.add('hidden');
+    }
+    openSidebarBtn.onclick = openSidebar;
+    closeSidebarBtn.onclick = closeSidebar;
+    sidebarOverlay.onclick = closeSidebar;
+    newChatBtn.onclick = createNewSession;
+
+    // RENDU HISTORIQUE
+    function renderHistoryList() {
+      historyList.innerHTML = '';
+      if (sessions.length === 0) {
+        historyList.innerHTML = `<p class="text-xs text-slate-500 italic px-2">Aucune discussion</p>`;
+        return;
+      }
+      sessions.forEach(s => {
+        const isActive = s.id === currentSessionId;
+        const item = document.createElement('div');
+        item.className = `flex items-center justify-between p-2.5 rounded-xl cursor-pointer text-sm transition ${
+          isActive ? 'bg-indigo-600/20 text-indigo-300 font-medium border border-indigo-500/30' : 'text-slate-400 hover:bg-slate-800'
+        }`;
+        item.onclick = () => {
+          currentSessionId = s.id;
+          saveToStorage();
+          renderHistoryList();
+          renderCurrentSession();
+          closeSidebar();
+        };
+        item.innerHTML = `
+          <div class="flex items-center gap-2 truncate max-w-[150px]">
+            <span>💬</span> <span class="truncate">${s.title}</span>
+          </div>
+          <button class="delete-btn text-slate-500 hover:text-red-400 px-1">✕</button>
+        `;
+        item.querySelector('.delete-btn').onclick = (e) => deleteSession(s.id, e);
+        historyList.appendChild(item);
+      });
+    }
+
+    // AUDIO
+    function speakText(text) {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const cleanText = text.replace(/<[^>]*>/g, '').replace(/[*_#`]/g, '');
+        const u = new SpeechSynthesisUtterance(cleanText);
+        u.lang = 'fr-FR';
+        window.speechSynthesis.speak(u);
+      }
+    }
+
+    // RENDU MESSAGE
+    function appendMessageUI(sender, text, isThinking = false) {
       const msgDiv = document.createElement('div');
-      msgDiv.className = sender === 'user' ? 'flex justify-end' : 'flex justify-start';
+      msgDiv.className = sender === 'user' ? 'flex justify-end my-2' : 'flex justify-start my-2';
+
+      const container = document.createElement('div');
+      container.className = 'flex flex-col gap-1 max-w-[88%]';
 
       const inner = document.createElement('div');
       inner.className = sender === 'user' 
-        ? 'bg-indigo-600 text-white rounded-2xl px-4 py-3 text-sm max-w-[85%]' 
-        : 'bg-slate-900 border border-slate-800 text-slate-200 rounded-2xl px-4 py-3 text-sm max-w-[85%]';
+        ? 'bg-indigo-600 text-white rounded-2xl px-4 py-3 text-sm shadow-md' 
+        : 'bg-slate-900 border border-slate-800 text-slate-200 rounded-2xl px-4 py-3 text-sm shadow-md';
 
       if (sender === 'bot') {
         inner.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : text;
@@ -67,42 +238,111 @@
         inner.textContent = text;
       }
 
-      msgDiv.appendChild(inner);
+      container.appendChild(inner);
+
+      if (sender === 'bot' && !isThinking) {
+        const audioBtn = document.createElement('button');
+        audioBtn.className = 'self-start text-xs text-slate-400 hover:text-indigo-400 flex items-center gap-1 px-1 py-0.5 mt-1 transition';
+        audioBtn.innerHTML = '🔊 Écouter';
+        audioBtn.onclick = () => speakText(text);
+        container.appendChild(audioBtn);
+      }
+
+      msgDiv.appendChild(container);
       chatBox.appendChild(msgDiv);
       chatBox.scrollTop = chatBox.scrollHeight;
       return inner;
     }
 
-    chatForm.addEventListener('submit', async (e) => {
+    function renderCurrentSession() {
+      chatBox.innerHTML = '';
+      const current = getCurrentSession();
+      if (!current || !current.messages || current.messages.length === 0) {
+        chatBox.innerHTML = `
+          <div class="p-4 bg-slate-900 border border-slate-800 rounded-2xl text-slate-300 text-sm">
+            👋 <b>Bienvenue sur Octopus AI !</b><br>Pose ta question ci-dessous pour démarrer.
+          </div>
+        `;
+        return;
+      }
+      current.messages.forEach(m => appendMessageUI(m.role === 'user' ? 'user' : 'bot', m.content));
+    }
+
+    // RACCOURCIS
+    document.querySelectorAll('.shortcut-btn').forEach(btn => {
+      btn.onclick = () => {
+        userInput.value = btn.getAttribute('data-prompt') + " ";
+        userInput.focus();
+      };
+    });
+
+    // ENVOI MESSAGE
+    chatForm.onsubmit = async (e) => {
       e.preventDefault();
       const text = userInput.value.trim();
       if (!text) return;
 
-      appendMessage('user', text);
-      userInput.value = '';
+      if (!currentSessionId || sessions.length === 0) createNewSession();
+      let current = getCurrentSession();
 
-      const botMsg = appendMessage('bot', '🐙 *Réflexion en cours...*');
+      if (current.messages.length === 0) {
+        current.title = text.slice(0, 20) + (text.length > 20 ? '...' : '');
+      }
+
+      appendMessageUI('user', text);
+      current.messages.push({ role: 'user', content: text });
+      saveToStorage();
+      renderHistoryList();
+
+      userInput.value = '';
+      const botElem = appendMessageUI('bot', '🐙 *Réflexion...*', true);
 
       try {
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text })
+          body: JSON.stringify({
+            message: text,
+            mode: modeSelect.value
+          })
         });
 
         const data = await res.json();
 
         if (res.ok && data.reply) {
-          botMsg.innerHTML = typeof marked !== 'undefined' ? marked.parse(data.reply) : data.reply;
+          botElem.innerHTML = typeof marked !== 'undefined' ? marked.parse(data.reply) : data.reply;
+          if (typeof Prism !== 'undefined') Prism.highlightAll();
+          
+          current.messages.push({ role: 'assistant', content: data.reply });
+          saveToStorage();
+
+          // Ajouter bouton écouter
+          const container = botElem.parentElement;
+          const audioBtn = document.createElement('button');
+          audioBtn.className = 'self-start text-xs text-slate-400 hover:text-indigo-400 flex items-center gap-1 px-1 py-0.5 mt-1 transition';
+          audioBtn.innerHTML = '🔊 Écouter';
+          audioBtn.onclick = () => speakText(data.reply);
+          container.appendChild(audioBtn);
+
         } else {
-          botMsg.innerHTML = `⚠️ **Erreur :** ${data.error || 'Problème de réponse API'}`;
+          botElem.innerHTML = `⚠️ **Erreur :** ${data.error || 'Erreur serveur'}`;
+          current.messages.pop();
+          saveToStorage();
         }
       } catch (err) {
-        botMsg.innerHTML = `⚠️ **Erreur réseau**`;
+        botElem.innerHTML = `⚠️ **Erreur réseau**`;
       }
 
       chatBox.scrollTop = chatBox.scrollHeight;
-    });
+    };
+
+    // INIT
+    if (sessions.length === 0) createNewSession();
+    else {
+      if (!currentSessionId || !getCurrentSession()) currentSessionId = sessions[0].id;
+      renderHistoryList();
+      renderCurrentSession();
+    }
   </script>
 </body>
   </html>
