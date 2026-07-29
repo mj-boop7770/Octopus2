@@ -1,182 +1,144 @@
 <!DOCTYPE html>
-<html lang="fr" class="h-full bg-slate-950 text-slate-100">
+<html lang="fr" class="dark">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Octopus AI</title>
-  
-  <!-- Tailwind CSS -->
+  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Marked.js pour le Markdown -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <!-- Prism.js pour la coloration de code -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
-  
+  <!-- Prism.js pour la coloration syntaxique du code -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-css.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+
   <style>
-    /* Scrollbar personnalisée discrète */
-    ::-webkit-scrollbar { width: 4px; height: 4px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
-    ::-webkit-scrollbar-thumb:hover { background: #475569; }
-
-    /* Animation pensée pour l'IA */
-    @keyframes pulse-glow {
-      0%, 100% { opacity: 0.4; transform: scale(1); }
-      50% { opacity: 0.8; transform: scale(1.05); }
+    /* Barre de défilement personnalisée aux couleurs ciel */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
     }
-    .octopus-glow { animation: pulse-glow 2s infinite ease-in-out; }
-
-    /* Style Markdown personnalisé */
-    .prose p { margin-bottom: 0.75rem; line-height: 1.6; }
-    .prose strong { color: #f8fafc; font-weight: 600; }
-    .prose code { background: #1e293b; color: #38bdf8; padding: 0.2rem 0.4rem; border-radius: 0.375rem; font-size: 0.85em; }
-    .prose pre { background: #0f172a !important; padding: 1rem; border-radius: 0.75rem; border: 1px solid #334155; margin: 0.75rem 0; overflow-x: auto; }
-    .prose ul { list-style-type: disc; padding-left: 1.25rem; margin-bottom: 0.75rem; }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #0284c7;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #38bdf8;
+    }
   </style>
 </head>
-<body class="h-full flex flex-col md:flex-row font-sans antialiased overflow-hidden selection:bg-indigo-500 selection:text-white">
+<body class="bg-slate-950 text-slate-100 font-sans h-screen flex flex-col overflow-hidden">
 
-  <!-- OVERLAY MOBILE -->
-  <div id="sidebar-overlay" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-40 hidden md:hidden"></div>
+  <!-- OVERLAY FLOU DERRIÈRE LA SIDEBAR SUR MOBILE -->
+  <div id="sidebar-overlay" class="fixed inset-0 bg-sky-950/40 z-40 hidden backdrop-blur-sm transition-opacity"></div>
 
-  <!-- BARRE LATÉRALE (Sidebar) -->
-  <aside id="sidebar" class="fixed md:static inset-y-0 left-0 w-72 bg-slate-900 border-r border-slate-800 p-4 z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out flex flex-col justify-between shadow-2xl md:shadow-none">
-    <div class="flex flex-col h-full min-h-0">
-      
-      <!-- En-tête Sidebar & Nouveau Chat -->
-      <div class="flex items-center justify-between mb-4 gap-2">
-        <button id="new-chat-btn" class="flex-1 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-medium py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition text-sm shadow-lg shadow-indigo-600/20">
-          <span>✨</span> Nouveau chat
-        </button>
-        <button id="close-sidebar-btn" class="md:hidden p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition">✕</button>
+  <!-- MENU LATÉRAL / SIDEBAR (HISTORIQUE DES DISCUSSIONS) -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-72 bg-slate-900 border-r border-sky-900/40 p-4 z-50 transform -translate-x-full transition-transform duration-300 flex flex-col justify-between shadow-2xl">
+    <div>
+      <!-- En-tête Sidebar -->
+      <div class="flex justify-between items-center mb-6 border-b border-sky-900/30 pb-3">
+        <h2 class="text-lg font-bold text-sky-400 flex items-center gap-2">
+          <span>🐙</span> Octopus AI
+        </h2>
+        <button id="close-sidebar-btn" class="text-sky-300/60 hover:text-sky-200 text-xl p-1 transition">✕</button>
       </div>
 
-      <!-- Recherche -->
-      <div class="relative mb-3">
-        <input type="text" id="search-history" placeholder="Rechercher..." class="w-full bg-slate-950 border border-slate-800 text-slate-200 placeholder-slate-500 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 transition">
-      </div>
+      <!-- Bouton Nouvelle Discussion -->
+      <button id="new-chat-btn" class="w-full bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 mb-6 shadow-lg shadow-sky-500/20 transition active:scale-[0.98]">
+        <span class="text-lg">+</span> Nouvelle discussion
+      </button>
 
-      <!-- Historique des conversations -->
-      <div class="flex-1 overflow-y-auto space-y-1 pr-1" id="history-list">
-        <!-- Contenu injecté par JS -->
+      <!-- Liste des discussions archivées -->
+      <div class="space-y-2">
+        <p class="text-xs font-semibold text-sky-400/70 uppercase tracking-wider px-1">Historique</p>
+        <div id="history-list" class="space-y-1 max-h-[60vh] overflow-y-auto pr-1">
+          <!-- Les sessions s'afficheront ici dynamiquement -->
+        </div>
       </div>
     </div>
 
-    <!-- Options & Modèle -->
-    <div class="border-t border-slate-800 pt-3 space-y-3 mt-auto">
-      <div>
-        <label class="text-[11px] font-semibold tracking-wider text-slate-400 uppercase block mb-1">Mode de travail</label>
-        <select id="mode-select" class="w-full bg-slate-950 border border-slate-800 text-slate-200 rounded-xl p-2 text-xs font-medium focus:outline-none focus:border-indigo-500 transition cursor-pointer">
-          <option value="code">💻 Développeur (Code & Bugs)</option>
-          <option value="writing">✍️ Redacteur (Rédaction & Style)</option>
-          <option value="general">🧠 Assistant Général</option>
-        </select>
-      </div>
-      
-      <div class="flex items-center justify-between pt-2 border-t border-slate-800/60 text-xs text-slate-400">
-        <div class="flex items-center gap-2">
-          <div class="w-7 h-7 rounded-lg bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center font-bold text-xs">🐙</div>
-          <span class="font-medium text-slate-300">Octopus v2.0</span>
-        </div>
-        <button id="export-chat-btn" class="text-slate-400 hover:text-indigo-400 transition text-xs flex items-center gap-1">
-          <span>📥</span> Exporter
-        </button>
-      </div>
+    <!-- Pied de Sidebar -->
+    <div class="text-xs text-sky-300/40 text-center border-t border-sky-900/30 pt-3">
+      Octopus AI • Bleu Ciel v2.0
     </div>
   </aside>
 
-  <!-- CONTENEUR PRINCIPAL -->
-  <main class="flex-1 flex flex-col h-full bg-slate-950 relative min-w-0">
-    
-    <!-- HEADER -->
-    <header class="h-14 border-b border-slate-800/80 px-4 flex justify-between items-center bg-slate-950/80 backdrop-blur-md sticky top-0 z-10">
-      <div class="flex items-center gap-3">
-        <button id="open-sidebar-btn" class="md:hidden p-2 text-slate-400 hover:text-white hover:bg-slate-900 rounded-lg transition">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
-        </button>
-        <div class="flex items-center gap-2">
-          <span class="text-xl">🐙</span>
-          <h1 class="text-sm font-semibold text-slate-100 tracking-wide">Octopus AI</h1>
-        </div>
-      </div>
+  <!-- ENTÊTE PRINCIPALE DE L'APPLICATION -->
+  <header class="bg-slate-900 border-b border-sky-900/40 px-4 py-3 flex items-center justify-between shadow-md">
+    <div class="flex items-center gap-3">
+      <button id="open-sidebar-btn" class="p-2 rounded-xl bg-slate-800 text-sky-400 hover:bg-slate-700 hover:text-sky-300 transition focus:outline-none">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+        </svg>
+      </button>
       <div class="flex items-center gap-2">
-        <span class="text-[11px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2.5 py-1 rounded-full font-medium flex items-center gap-1.5">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-          Groq Powered
-        </span>
+        <span class="text-2xl">🐙</span>
+        <h1 class="font-bold text-lg text-slate-100 tracking-wide">Octopus <span class="text-sky-400">AI</span></h1>
       </div>
-    </header>
-
-    <!-- ZONE DE DISCUSSION (CHAT BOX) -->
-    <div id="chat-box" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 max-w-4xl w-full mx-auto">
-      
-      <!-- Message de bienvenue -->
-      <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 md:p-5 text-slate-300 text-sm shadow-xl flex gap-3 items-start">
-        <div class="text-2xl">👋</div>
-        <div class="space-y-1">
-          <p class="font-semibold text-white">Salut Léandre !</p>
-          <p class="text-slate-400 text-xs md:text-sm">Tout est prêt. Choisis un raccourci ci-dessous ou pose ta question directement.</p>
-        </div>
-      </div>
-
     </div>
 
-    <!-- PIED DE PAGE : RACCOURCIS & FORMULAIRE -->
-    <footer class="p-3 md:p-4 border-t border-slate-800/80 bg-slate-950/90 backdrop-blur-md">
-      <div class="max-w-4xl mx-auto space-y-3">
-        
-        <!-- RACCOURCIS RAPIDES (Puces élégantes) -->
-        <div class="flex items-center gap-2 overflow-x-auto pb-1 text-xs no-scrollbar">
-          <button type="button" class="shortcut-btn shrink-0 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-indigo-300 border border-slate-800 hover:border-indigo-500/50 px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 shadow-sm" data-prompt="🐛 Analyse ce code et trouve les bugs potentiels :">
-            <span>🐛</span> Débugger
-          </button>
-          <button type="button" class="shortcut-btn shrink-0 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-indigo-300 border border-slate-800 hover:border-indigo-500/50 px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 shadow-sm" data-prompt="🚀 Optimise ce code pour le rendre plus propre et rapide :">
-            <span>🚀</span> Optimiser
-          </button>
-          <button type="button" class="shortcut-btn shrink-0 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-indigo-300 border border-slate-800 hover:border-indigo-500/50 px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 shadow-sm" data-prompt="📝 Explique-moi ce code ligne par ligne en détail :">
-            <span>📝</span> Expliquer
-          </button>
-          <button type="button" class="shortcut-btn shrink-0 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-indigo-300 border border-slate-800 hover:border-indigo-500/50 px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 shadow-sm" data-prompt="✍️ Corrige, fluidifie et améliore le style de ce texte :">
-            <span>✍️</span> Style & Reformulation
-          </button>
-        </div>
+    <!-- SÉLECTEUR DE MODE -->
+    <div class="flex items-center gap-2">
+      <select id="mode-select" class="bg-slate-800 border border-sky-500/30 text-sky-200 text-xs font-medium rounded-xl px-3 py-1.5 focus:outline-none focus:border-sky-400 transition">
+        <option value="general">🌐 Général</option>
+        <option value="code">💻 Code & Dev</option>
+        <option value="writing">✍️ Rédaction</option>
+      </select>
+    </div>
+  </header>
 
-        <!-- PRÉVISUALISATION FICHIER -->
-        <div id="file-preview" class="hidden text-xs bg-indigo-950/50 text-indigo-300 p-2.5 rounded-xl flex justify-between items-center border border-indigo-800/50">
-          <span id="file-name" class="font-medium truncate flex items-center gap-2">📎 fichier.txt</span>
-          <button type="button" id="remove-file" class="text-slate-400 hover:text-red-400 font-bold px-1 transition">✕</button>
-        </div>
-
-        <!-- FORMULAIRE DE SAISIE -->
-        <form id="chat-form" class="flex gap-2 items-end bg-slate-900 rounded-2xl p-2 border border-slate-800 focus-within:border-indigo-500/60 focus-within:ring-1 focus-within:ring-indigo-500/30 transition shadow-inner">
-          
-          <!-- Bouton Fichier -->
-          <label for="file-input" class="cursor-pointer p-2 text-slate-400 hover:text-indigo-400 transition rounded-xl hover:bg-slate-800/60 flex items-center justify-center shrink-0" title="Joindre un fichier">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
-            <input type="file" id="file-input" class="hidden" accept=".js,.py,.html,.css,.json,.txt,.md,image/*">
-          </label>
-
-          <!-- Champ Texte -->
-          <textarea id="user-input" rows="1" placeholder="Pose une question ou colle du code..." class="flex-1 bg-transparent text-slate-100 placeholder-slate-500 text-sm focus:outline-none resize-none px-2 py-1.5 max-h-32 min-h-[38px]"></textarea>
-
-          <!-- Bouton Envoyer -->
-          <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white p-2.5 rounded-xl transition font-medium shadow-md shadow-indigo-600/30 shrink-0 flex items-center justify-center">
-            <svg class="w-4 h-4 transform rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19V5m0 0l-7 7m7-7l7 7"></path></svg>
-          </button>
-        </form>
-
-      </div>
-    </footer>
-
+  <!-- CONTENEUR PRINCIPAL DE LA DISCUSSION -->
+  <main class="flex-1 overflow-y-auto p-4 md:p-6" id="chat-box">
+    <!-- Les messages seront générés ici par app.js -->
   </main>
 
-  <!-- Scripts Prism.js -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-css.min.js"></script>
+  <!-- APERÇU DU FICHIER JOINT -->
+  <div id="file-preview" class="hidden px-4 py-2 bg-slate-900 border-t border-sky-900/30 flex items-center justify-between text-xs text-sky-300">
+    <span id="file-name" class="truncate max-w-[80%] font-mono">📎 Fichier prêt</span>
+    <button id="remove-file" class="text-sky-400 hover:text-red-400 font-bold px-2 py-0.5 transition">✕ Supprimer</button>
+  </div>
 
+  <!-- BARRE DE SAISIE ET ENVOI -->
+  <footer class="bg-slate-900 border-t border-sky-900/40 p-3 md:p-4">
+    <form id="chat-form" class="max-w-4xl mx-auto flex items-end gap-2 bg-slate-950 border border-sky-900/50 rounded-2xl p-2 focus-within:border-sky-400 focus-within:ring-1 focus-within:ring-sky-400 transition shadow-lg">
+      
+      <!-- BOUTON FICHIER JOINT -->
+      <label for="file-input" class="p-2 text-sky-400 hover:text-sky-200 hover:bg-slate-900 rounded-xl cursor-pointer transition flex items-center justify-center">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path>
+        </svg>
+        <input type="file" id="file-input" class="hidden" accept=".txt,.js,.html,.css,.json,.py,.md" />
+      </label>
+
+      <!-- CHAMP DE SAISIE TEXTE -->
+      <textarea 
+        id="user-input" 
+        rows="1" 
+        placeholder="Pose ta question à Octopus..." 
+        class="flex-1 bg-transparent text-slate-100 placeholder-sky-300/40 text-sm focus:outline-none resize-none max-h-32 py-2 px-1 font-sans"
+      ></textarea>
+
+      <!-- BOUTON D'ENVOI -->
+      <button 
+        type="submit" 
+        id="send-btn" 
+        class="bg-sky-500 hover:bg-sky-400 text-slate-950 p-2.5 rounded-xl transition shadow-md shadow-sky-500/20 active:scale-95 flex items-center justify-center font-bold"
+      >
+        <svg class="w-5 h-5 transform rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19V5m0 0l-7 7m7-7l7 7"></path>
+        </svg>
+      </button>
+    </form>
+  </footer>
+
+  <!-- SCRIPT JS DE L'APPLICATION -->
   <script src="app.js"></script>
 </body>
-          </html>
-  
+</html>
