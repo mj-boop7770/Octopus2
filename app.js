@@ -15,7 +15,7 @@ const sidebarOverlay = document.getElementById('sidebar-overlay');
 const newChatBtn = document.getElementById('new-chat-btn');
 const historyList = document.getElementById('history-list');
 
-// Structure sécurisée des données
+// Gestion sécurisée du Stockage Local
 let sessions = [];
 try {
   const saved = localStorage.getItem('octopus_sessions');
@@ -28,7 +28,7 @@ try {
 let currentSessionId = localStorage.getItem('octopus_current_session') || null;
 let currentFileContent = "";
 
-// 1. GESTION DE LA SIDEBAR
+// 1. NAVIGATION ET SIDEBAR
 function openSidebar() {
   if (sidebar) sidebar.classList.remove('-translate-x-full');
   if (sidebarOverlay) sidebarOverlay.classList.remove('hidden');
@@ -49,7 +49,7 @@ if (userInput) {
   });
 }
 
-// 2. SAUVEGARDE & SESSIONS
+// 2. GESTION DES SESSIONS ET DE L'HISTORIQUE
 function saveToStorage() {
   localStorage.setItem('octopus_sessions', JSON.stringify(sessions));
   localStorage.setItem('octopus_current_session', currentSessionId || '');
@@ -143,19 +143,19 @@ function renderCurrentSession() {
   });
 }
 
-// 3. FICHIERS JOINTS
+// 3. GESTION DES FICHIERS JOINTS
 if (fileInput) {
   fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
       if (file.type.startsWith('image/')) {
-        alert("Les images ne sont pas encore prises en charge.");
+        alert("Les images ne sont pas encore pris en charge.");
         fileInput.value = '';
         return;
       }
       const reader = new FileReader();
       reader.onload = (event) => {
-        currentFileContent = `\n\n[Contenu du fichier ${file.name}]:\n${event.target.result}`;
+        currentFileContent = `\n\n[Fichier joint ${file.name}]:\n${event.target.result}`;
         if (fileName) fileName.textContent = `📎 ${file.name}`;
         if (filePreview) filePreview.classList.remove('hidden');
       };
@@ -172,7 +172,7 @@ if (removeFileBtn) {
   });
 }
 
-// 4. LECTURE AUDIO
+// 4. LECTURE AUDIO DES RÉPONSES
 function speakText(text) {
   if ('speechSynthesis' in window) {
     window.speechSynthesis.cancel();
@@ -183,7 +183,7 @@ function speakText(text) {
   }
 }
 
-// 5. RENDU VISUEL D'UN MESSAGE
+// 5. AFFICHAGE DES MESSAGES DANS LE CHAT
 function appendMessageUI(sender, text, isThinking = false) {
   const messageDiv = document.createElement('div');
   messageDiv.className = sender === 'user' ? 'flex justify-end my-2' : 'flex justify-start my-2';
@@ -218,7 +218,7 @@ function appendMessageUI(sender, text, isThinking = false) {
   return innerDiv;
 }
 
-// 6. RACCOURCIS
+// 6. RACCOURCIS BOUTONS (Débugger, Optimiser, etc.)
 document.querySelectorAll('.shortcut-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const promptText = btn.getAttribute('data-prompt');
@@ -229,7 +229,7 @@ document.querySelectorAll('.shortcut-btn').forEach(btn => {
   });
 });
 
-// 7. ENVOI DE MESSAGE
+// 7. ENVOI DES MESSAGES VERS LE BACKEND
 async function sendMessage(customPrompt = null) {
   const text = customPrompt || (userInput ? userInput.value.trim() : '');
   if (!text && !currentFileContent) return;
@@ -268,6 +268,7 @@ async function sendMessage(customPrompt = null) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        prompt: text, // Transmis explicitement pour éliminer l'erreur de message requis
         messages: current.messages,
         mode: modeSelect ? modeSelect.value : 'general'
       })
@@ -316,7 +317,7 @@ if (chatForm) {
   });
 }
 
-// INITIALISATION SÉCURISÉE
+// INITIALISATION SÉCURISÉE AU CHARGEMENT DE LA PAGE
 if (sessions.length === 0) {
   createNewSession();
 } else {
@@ -325,5 +326,5 @@ if (sessions.length === 0) {
   }
   renderHistoryList();
   renderCurrentSession();
-    }
-  
+  }
+    
