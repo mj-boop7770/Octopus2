@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" class="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -11,63 +11,71 @@
   <!-- Prism.js pour la coloration syntaxique -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-css.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
 
   <style>
-    /* Custom Scrollbar Ciel */
+    /* Scrollbar sombre d'origine */
     ::-webkit-scrollbar { width: 5px; }
-    ::-webkit-scrollbar-track { background: #e0f2fe; }
-    ::-webkit-scrollbar-thumb { background: #38bdf8; border-radius: 9999px; }
+    ::-webkit-scrollbar-track { background: #030712; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
   </style>
 </head>
-<body class="bg-sky-50 text-slate-800 font-sans h-screen flex flex-col overflow-hidden">
+<body class="bg-[#030712] text-slate-100 font-sans h-screen flex flex-col overflow-hidden">
 
   <!-- OVERLAY MOBILE -->
-  <div id="sidebar-overlay" class="fixed inset-0 bg-sky-950/30 z-40 hidden backdrop-blur-sm transition-opacity"></div>
+  <div id="sidebar-overlay" class="fixed inset-0 bg-black/60 z-40 hidden backdrop-blur-sm transition-opacity"></div>
 
-  <!-- MENU LATÉRAL / SIDEBAR -->
-  <aside id="sidebar" class="fixed inset-y-0 left-0 w-72 bg-white border-r border-sky-100 p-4 z-50 transform -translate-x-full transition-transform duration-300 flex flex-col justify-between shadow-2xl">
+  <!-- MENU LATÉRAL / SIDEBAR (HISTORIQUE DES DISCUSSIONS) -->
+  <aside id="sidebar" class="fixed inset-y-0 left-0 w-72 bg-[#090d16] border-r border-slate-800/80 p-4 z-50 transform -translate-x-full transition-transform duration-300 flex flex-col justify-between shadow-2xl">
     <div>
-      <div class="flex justify-between items-center mb-6 border-b border-sky-100 pb-3">
-        <h2 class="text-lg font-bold text-sky-600 flex items-center gap-2">
+      <div class="flex justify-between items-center mb-6 border-b border-slate-800/80 pb-3">
+        <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
           <span>🐙</span> Octopus AI
         </h2>
-        <button id="close-sidebar-btn" class="text-sky-400 hover:text-sky-600 text-xl p-1 transition">✕</button>
+        <button id="close-sidebar-btn" class="text-slate-400 hover:text-white text-xl p-1 transition">✕</button>
       </div>
 
-      <button id="new-chat-btn" class="w-full bg-sky-500 hover:bg-sky-600 text-white font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 mb-6 shadow-lg shadow-sky-500/20 transition active:scale-[0.98]">
+      <button id="new-chat-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 mb-6 shadow-lg shadow-indigo-600/20 transition active:scale-[0.98]">
         <span class="text-lg">+</span> Nouvelle discussion
       </button>
 
       <div class="space-y-2">
-        <p class="text-xs font-semibold text-sky-500 uppercase tracking-wider px-1">Historique</p>
+        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider px-1">Historique</p>
         <div id="history-list" class="space-y-1 max-h-[60vh] overflow-y-auto pr-1">
           <!-- Historique généré par app.js -->
         </div>
       </div>
     </div>
 
-    <div class="text-xs text-sky-400 text-center border-t border-sky-100 pt-3">
-      Octopus AI • Bleu Ciel v2.0
+    <div class="text-xs text-slate-500 text-center border-t border-slate-800/80 pt-3">
+      Octopus AI v2.0
     </div>
   </aside>
 
   <!-- ENTÊTE (HEADER) -->
-  <header class="bg-white/80 backdrop-blur-md border-b border-sky-100 px-4 py-3 flex items-center justify-between shadow-sm">
+  <header class="bg-[#090d16] border-b border-slate-800/80 px-4 py-3 flex items-center justify-between shadow-md">
     <div class="flex items-center gap-3">
-      <button id="open-sidebar-btn" class="p-2 rounded-xl bg-sky-100/60 text-sky-600 hover:bg-sky-200/60 transition focus:outline-none">
+      <button id="open-sidebar-btn" class="p-2 rounded-xl bg-slate-900 border border-slate-800 text-indigo-400 hover:bg-slate-800 transition focus:outline-none">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
         </svg>
       </button>
       <div class="flex items-center gap-2">
         <span class="text-2xl">🐙</span>
-        <h1 class="font-bold text-lg text-slate-800 tracking-wide">Octopus <span class="text-sky-500">AI</span></h1>
+        <h1 class="font-bold text-lg text-slate-100 tracking-wide">Octopus <span class="text-indigo-400">AI</span></h1>
       </div>
     </div>
 
-    <!-- SÉLECTEUR DE MODE -->
+    <!-- BADGE ET SÉLECTEUR DE MODE -->
     <div class="flex items-center gap-2">
-      <select id="mode-select" class="bg-sky-100/60 border border-sky-200 text-sky-700 text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-400 transition">
+      <span class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-950/60 text-indigo-400 border border-indigo-800/50">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Groq Powered
+      </span>
+      <select id="mode-select" class="bg-slate-900 border border-slate-800 text-indigo-300 text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-indigo-500 transition">
         <option value="general">🌐 Général</option>
         <option value="code">💻 Code & Dev</option>
         <option value="writing">✍️ Rédaction</option>
@@ -75,22 +83,37 @@
     </div>
   </header>
 
-  <!-- CONTENEUR DE CHAT -->
+  <!-- CONTENEUR PRINCIPAL DE LA DISCUSSION -->
   <main class="flex-1 overflow-y-auto p-4 md:p-6 space-y-4" id="chat-box">
     <!-- Messages générés par app.js -->
   </main>
 
-  <!-- APERÇU DU FICHIER -->
-  <div id="file-preview" class="hidden px-4 py-2 bg-sky-100/50 border-t border-sky-200 flex items-center justify-between text-xs text-sky-700">
+  <!-- APERÇU DU FICHIER JOINT -->
+  <div id="file-preview" class="hidden px-4 py-2 bg-[#090d16] border-t border-slate-800/80 flex items-center justify-between text-xs text-indigo-300">
     <span id="file-name" class="truncate max-w-[80%] font-mono">📎 Fichier prêt</span>
-    <button id="remove-file" class="text-red-500 hover:text-red-700 font-bold px-2 py-0.5 transition">✕ Supprimer</button>
+    <button id="remove-file" class="text-red-400 hover:text-red-300 font-bold px-2 py-0.5 transition">✕ Supprimer</button>
   </div>
 
-  <!-- BARRE DE SAISIE -->
-  <footer class="bg-white border-t border-sky-100 p-3 md:p-4">
-    <form id="chat-form" class="max-w-4xl mx-auto flex items-end gap-2 bg-sky-50/60 border border-sky-200 rounded-2xl p-2 focus-within:border-sky-400 focus-within:ring-2 focus-within:ring-sky-300/40 transition shadow-sm">
+  <!-- BARRE RACCOURCIS + BARRE DE SAISIE -->
+  <footer class="bg-[#090d16] border-t border-slate-800/80 p-3 md:p-4 space-y-3">
+    
+    <!-- RACCOURCIS RAPIDES (Comme sur la photo 2) -->
+    <div class="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs">
+      <button class="shortcut-btn shrink-0 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition" data-prompt="Trouve et corrige le bug dans ce code :">
+        🐛 Débugger
+      </button>
+      <button class="shortcut-btn shrink-0 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition" data-prompt="Optimise ce code pour le rendre plus propre et plus rapide :">
+        🚀 Optimiser
+      </button>
+      <button class="shortcut-btn shrink-0 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition" data-prompt="Explique-moi le fonctionnement de ce code en détail :">
+        📝 Expliquer
+      </button>
+    </div>
+
+    <!-- CHAMP DE SAISIE AVEC BOUTON VIOLET D'ORIGINE -->
+    <form id="chat-form" class="max-w-4xl mx-auto flex items-end gap-2 bg-[#030712] border border-indigo-900/40 rounded-2xl p-2 focus-within:border-indigo-500 transition shadow-lg">
       
-      <label for="file-input" class="p-2 text-sky-500 hover:text-sky-700 hover:bg-sky-100/50 rounded-xl cursor-pointer transition flex items-center justify-center">
+      <label for="file-input" class="p-2 text-slate-400 hover:text-indigo-400 hover:bg-slate-900 rounded-xl cursor-pointer transition flex items-center justify-center">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path>
         </svg>
@@ -100,14 +123,14 @@
       <textarea 
         id="user-input" 
         rows="1" 
-        placeholder="Pose ta question à Octopus..." 
-        class="flex-1 bg-transparent text-slate-800 placeholder-sky-400/70 text-sm focus:outline-none resize-none max-h-32 py-2 px-1 font-sans"
+        placeholder="Pose une question ou colle du code" 
+        class="flex-1 bg-transparent text-slate-100 placeholder-slate-500 text-sm focus:outline-none resize-none max-h-32 py-2 px-1 font-sans"
       ></textarea>
 
       <button 
         type="submit" 
         id="send-btn" 
-        class="bg-sky-500 hover:bg-sky-600 text-white p-2.5 rounded-xl transition shadow-md shadow-sky-500/20 active:scale-95 flex items-center justify-center font-bold"
+        class="bg-indigo-600 hover:bg-indigo-500 text-white p-2.5 rounded-xl transition shadow-md shadow-indigo-600/30 active:scale-95 flex items-center justify-center font-bold"
       >
         <svg class="w-5 h-5 transform rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19V5m0 0l-7 7m7-7l7 7"></path>
