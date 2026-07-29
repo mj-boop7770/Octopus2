@@ -1,12 +1,10 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Éléments du DOM - UI & Menu
     const sidebar = document.getElementById('sidebar');
     const sidebarOverlay = document.getElementById('sidebar-overlay');
     const openSidebarBtn = document.getElementById('open-sidebar-btn');
     const closeSidebarBtn = document.getElementById('close-sidebar-btn');
     const octopusLogo = document.getElementById('octopus-logo');
 
-    // Éléments du DOM - Formulaire & Chat
     const chatForm = document.getElementById('chat-form');
     const userInput = document.getElementById('user-input');
     const chatBox = document.getElementById('chat-box');
@@ -15,50 +13,41 @@ document.addEventListener('DOMContentLoaded', () => {
     const fileNameSpan = document.getElementById('file-name');
     const removeFileBtn = document.getElementById('remove-file');
     const historyList = document.getElementById('history-list');
+    const searchHistoryInput = document.getElementById('search-history');
     const newChatBtn = document.getElementById('new-chat-btn');
     const modeSelect = document.getElementById('mode-select');
+    const exportChatBtn = document.getElementById('export-chat-btn');
+    const shortcutBtns = document.querySelectorAll('.shortcut-btn');
 
     let currentFileContent = null;
     let currentFileName = null;
     let chatHistory = JSON.parse(localStorage.getItem('octopus_chats')) || [];
 
-    // --- 1. GESTION DU MENU MOBILE (SIDEBAR) ---
-    function openSidebar() {
-        sidebar.classList.remove('-translate-x-full');
-        sidebarOverlay.classList.remove('hidden');
+    // --- MENU MOBILE ---
+    function toggleSidebar() {
+        sidebar.classList.toggle('-translate-x-full');
+        sidebarOverlay.classList.toggle('hidden');
     }
+    openSidebarBtn?.addEventListener('click', toggleSidebar);
+    closeSidebarBtn?.addEventListener('click', toggleSidebar);
+    sidebarOverlay?.addEventListener('click', toggleSidebar);
 
-    function closeSidebar() {
-        sidebar.classList.add('-translate-x-full');
-        sidebarOverlay.classList.add('hidden');
-    }
-
-    openSidebarBtn?.addEventListener('click', openSidebar);
-    closeSidebarBtn?.addEventListener('click', closeSidebar);
-    sidebarOverlay?.addEventListener('click', closeSidebar);
-
-    // Charger l'historique au démarrage
     renderHistory();
 
-    // --- 2. GESTION DES FICHIERS ET PIÈCES JOINTES ---
+    // --- GESTION FICHIERS ---
     fileInput?.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
         currentFileName = file.name;
         fileNameSpan.textContent = currentFileName;
         filePreview.classList.remove('hidden');
 
         const reader = new FileReader();
         if (file.type.startsWith('image/')) {
-            reader.onload = (event) => {
-                currentFileContent = event.target.result;
-            };
+            reader.onload = (ev) => currentFileContent = ev.target.result;
             reader.readAsDataURL(file);
         } else {
-            reader.onload = (event) => {
-                currentFileContent = event.target.result;
-            };
+            reader.onload = (ev) => currentFileContent = ev.target.result;
             reader.readAsText(file);
         }
     });
@@ -70,22 +59,26 @@ document.addEventListener('DOMContentLoaded', () => {
         filePreview.classList.add('hidden');
     });
 
-    // --- 3. ANIMATION DU LOGO (OCTOPUS PENSE) ---
+    // --- RACCOURCIS RAPIDES ---
+    shortcutBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            userInput.value = btn.getAttribute('data-prompt') + " ";
+            userInput.focus();
+        });
+    });
+
+    // --- ANIMATION LOGO ---
     function setThinkingState(isThinking) {
-        if (isThinking) {
-            octopusLogo.classList.add('octopus-thinking');
-        } else {
-            octopusLogo.classList.remove('octopus-thinking');
-        }
+        if (isThinking) octopusLogo.classList.add('octopus-thinking');
+        else octopusLogo.classList.remove('octopus-thinking');
     }
 
-    // --- 4. ENVOI DES MESSAGES ---
+    // --- SOUMMISSION & API ---
     chatForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const text = userInput.value.trim();
         if (!text && !currentFileContent) return;
 
-        // Construire le message avec pièce jointe si présente
         let messagePayload = text;
         if (currentFileName && currentFileContent) {
             messagePayload += `\n\n[Fichier attaché : ${currentFileName}]\n${currentFileContent}`;
@@ -94,14 +87,12 @@ document.addEventListener('DOMContentLoaded', () => {
         appendMessage('user', text || `[Fichier : ${currentFileName}]`);
         userInput.value = '';
         
-        // Nettoyer la pièce jointe
         const payloadForApi = messagePayload;
         fileInput.value = '';
         currentFileContent = null;
         currentFileName = null;
         filePreview.classList.add('hidden');
 
-        // Activer l'animation de réflexion du logo
         setThinkingState(true);
         const loadingId = appendMessage('assistant', '🐙 Réflexion en cours...');
 
@@ -109,10 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    message: payloadForApi,
-                    mode: modeSelect.value 
-                })
+                body: JSON.stringify({ message: payloadForApi, mode: modeSelect.value })
             });
 
             const data = await response.json();
@@ -120,7 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setThinkingState(false);
 
             if (data.reply) {
-                appendMessage('assistant', data.reply);
+                appendMessage('assistant', data.reply, true); // Ajout du bouton audio
                 saveChatToLocalStorage(text || 'Discussion Fichier', data.reply);
             } else {
                 appendMessage('assistant', '⚠️ Erreur : Réponse vide de l\'API.');
@@ -128,31 +116,41 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             removeMessage(loadingId);
             setThinkingState(false);
-            appendMessage('assistant', '❌ Erreur de connexion avec le serveur Vercel/Groq.');
+            appendMessage('assistant', '❌ Erreur de connexion au serveur.');
             console.error(error);
         }
     });
 
-    // --- 5. AFFICHAGE DES MESSAGES ET BLOCS DE CODE ---
-    function appendMessage(sender, text) {
+    // --- AFFICHAGE & SYNTHÈSE VOCALE ---
+    function appendMessage(sender, text, allowSpeech = false) {
         const messageId = 'msg-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
         const messageDiv = document.createElement('div');
         messageDiv.id = messageId;
-        messageDiv.className = `p-4 rounded-2xl text-sm border ${
+        messageDiv.className = `p-4 rounded-2xl text-sm border relative group ${
             sender === 'user' 
                 ? 'bg-indigo-50 border-indigo-100 text-indigo-950 ml-6 md:ml-12' 
                 : 'bg-white border-gray-200 text-gray-800 mr-6 md:mr-12 shadow-sm'
         }`;
 
-        messageDiv.innerHTML = formatMarkdown(text);
+        let htmlContent = formatMarkdown(text);
+
+        // Ajouter un bouton de lecture audio (Synthèse vocale) pour les réponses de l'IA
+        if (allowSpeech && 'speechSynthesis' in window) {
+            const safeTextForSpeech = text.replace(/```[\s\S]*?```/g, ' [bloc de code omis] ');
+            htmlContent += `
+                <div class="mt-2 pt-2 border-t border-gray-100 flex justify-end">
+                    <button onclick="speakText(\`${safeTextForSpeech.replace(/["`]/g, "'")}\`)" class="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1 font-medium bg-indigo-50 px-2 py-1 rounded-lg">
+                        🔊 Écouter
+                    </button>
+                </div>
+            `;
+        }
+
+        messageDiv.innerHTML = htmlContent;
         chatBox.appendChild(messageDiv);
         chatBox.scrollTop = chatBox.scrollHeight;
 
-        // Coloration du code Prism.js
-        if (window.Prism) {
-            Prism.highlightAll();
-        }
-
+        if (window.Prism) Prism.highlightAll();
         return messageId;
     }
 
@@ -161,13 +159,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (el) el.remove();
     }
 
+    // Fonction globale pour la synthèse vocale
+    window.speakText = function(text) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'fr-FR';
+        window.speechSynthesis.speak(utterance);
+    };
+
     function formatMarkdown(content) {
         let formatted = content
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;");
 
-        // Formatage des blocs de code avec bouton de copie
         formatted = formatted.replace(/```([a-z]*)\n([\s\S]*?)```/g, (match, lang, code) => {
             const codeId = 'code-' + Math.random().toString(36).substring(2, 9);
             return `
@@ -180,21 +185,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
         });
-
         return formatted.replace(/\n/g, '<br>');
     }
 
-    // --- 6. HISTORIQUE LOCALSTORAGE ---
+    // --- HISTORIQUE & RECHERCHE ---
     function saveChatToLocalStorage(userMsg, aiMsg) {
-        chatHistory.push({ user: userMsg, ai: aiMsg });
+        chatHistory.push({ user: userMsg, ai: aiMsg, date: new Date().toLocaleDateString() });
         localStorage.setItem('octopus_chats', JSON.stringify(chatHistory));
         renderHistory();
     }
 
-    function renderHistory() {
+    function renderHistory(filter = '') {
         if (!historyList) return;
         historyList.innerHTML = '';
-        chatHistory.slice(-10).reverse().forEach((chat) => {
+        
+        const filtered = chatHistory.filter(c => c.user.toLowerCase().includes(filter.toLowerCase()));
+
+        filtered.slice(-15).reverse().forEach((chat) => {
             const item = document.createElement('div');
             item.className = 'text-xs text-gray-600 hover:bg-gray-100 p-2.5 rounded-xl cursor-pointer truncate transition font-medium';
             item.textContent = chat.user;
@@ -202,13 +209,33 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    searchHistoryInput?.addEventListener('input', (e) => {
+        renderHistory(e.target.value);
+    });
+
     newChatBtn?.addEventListener('click', () => {
         chatBox.innerHTML = `
             <div class="bg-gray-50 p-4 rounded-2xl border border-gray-100 text-gray-700 text-sm">
                 👋 Nouvelle session prête ! Dis-moi tout.
             </div>
         `;
-        closeSidebar();
+        if(window.innerWidth < 768) toggleSidebar();
+    });
+
+    // --- EXPORT DE DISCUSSION ---
+    exportChatBtn?.addEventListener('click', () => {
+        if (chatHistory.length === 0) {
+            alert("Aucune conversation à exporter !");
+            return;
+        }
+        const markdownContent = chatHistory.map(c => `### Question :\n${c.user}\n\n### Octopus :\n${c.ai}\n\n---\n`).join('\n');
+        const blob = new Blob([markdownContent], { type: 'text/markdown;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Octopus-Export-${Date.now()}.md`;
+        a.click();
+        URL.revokeObjectURL(url);
     });
 });
-            
+    
