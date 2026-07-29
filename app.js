@@ -3,7 +3,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Méthode non autorisée' });
   }
 
-  const { message } = req.body;
+  const { message, mode } = req.body;
 
   if (!message || !message.trim()) {
     return res.status(400).json({ error: 'Le message est requis' });
@@ -11,7 +11,15 @@ export default async function handler(req, res) {
 
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: 'Clé GROQ_API_KEY non trouvée dans Vercel' });
+    return res.status(500).json({ error: 'Clé GROQ_API_KEY manquante dans Vercel' });
+  }
+
+  // Définir le rôle selon le mode sélectionné
+  let systemPrompt = 'Tu es Octopus AI, un assistant virtuel rapide, intelligent et précis.';
+  if (mode === 'code') {
+    systemPrompt = 'Tu es Octopus AI, un expert en programmation et développement. Fournis du code propre, expliqué et fonctionnel.';
+  } else if (mode === 'writing') {
+    systemPrompt = 'Tu es Octopus AI, un expert en rédaction, orthographe et correction de texte.';
   }
 
   try {
@@ -24,7 +32,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
         messages: [
-          { role: 'system', content: 'Tu es Octopus AI, un assistant direct et efficace.' },
+          { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
         ]
       })
@@ -42,4 +50,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Erreur interne du serveur' });
   }
            }
-                                 
