@@ -1,6 +1,7 @@
 import { createPlan } from './lib/planner.js';
 import { getProjectMemory } from './lib/memory.js';
 import { getAgentPrompt } from './lib/specializedAgents.js';
+import { verifyAndRefine } from './lib/reviewer.js';
 
 // Fonction de recherche Web via Tavily (Niveau 9 - Web Agent)
 async function searchTavily(query, apiKey) {
@@ -106,7 +107,7 @@ export default async function handler(req, res) {
   let lastErrorDetail = "";
 
   // -------------------------------------------------------------
-  // GENERATION DE LA REPONSE FINALE VIA GROQ
+  // GENERATION DE LA REPONSE INITIALE VIA GROQ
   // -------------------------------------------------------------
   for (const model of models) {
     try {
@@ -127,8 +128,19 @@ export default async function handler(req, res) {
       const data = await groqRes.json();
 
       if (groqRes.ok && data.choices?.[0]?.message?.content) {
+        let finalReply = data.choices[0].message.content;
+
+        // -------------------------------------------------------------
+        // NIVEAU 10 : BOUCLE INTELIGHTENTE / AUTO-CORRECTION
+        // (S'active sur le code, le debug, les tests et la review)
+        // -------------------------------------------------------------
+        const technicalAgents = ['code', 'debug', 'review', 'test'];
+        if (technicalAgents.includes(activeAgent)) {
+          finalReply = await verifyAndRefine(finalReply, lastUserMessage, apiKey);
+        }
+
         return res.status(200).json({ 
-          reply: data.choices[0].message.content,
+          reply: finalReply,
           plan: planSteps,
           agentUsed: activeAgent
         });
@@ -141,5 +153,5 @@ export default async function handler(req, res) {
   }
 
   return res.status(500).json({ error: `Groq: ${lastErrorDetail || "Erreur de connexion"}` });
-}
-  
+    }
+      
