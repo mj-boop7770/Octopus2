@@ -1,38 +1,31 @@
-// Fonction de recherche DuckDuckGo (Sans clé API - Gratuit & Illimité)
+// Fonction DuckDuckGo (API publique, gratuite, sans clé API requis)
 async function searchDuckDuckGo(query) {
   try {
-    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      }
-    });
-
+    const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
+    const response = await fetch(url);
     if (!response.ok) return [];
 
-    const html = await response.text();
+    const data = await response.json();
     const results = [];
-    
-    // Extraction des extraits depuis le HTML de DuckDuckGo
-    const regExp = /<a class="result__snippet[^>]*>([\s\S]*?)<\/a>/g;
-    let match;
-    let count = 0;
 
-    while ((match = regExp.exec(html)) !== null && count < 3) {
-      const cleanText = match[1].replace(/<[^>]+>/g, '').trim();
-      if (cleanText) {
-        results.push({ content: cleanText });
-        count++;
-      }
+    if (data.AbstractText) {
+      results.push({ content: data.AbstractText });
     }
+
+    if (data.RelatedTopics && Array.isArray(data.RelatedTopics)) {
+      data.RelatedTopics.slice(0, 3).forEach(topic => {
+        if (topic.Text) results.push({ content: topic.Text });
+      });
+    }
+
     return results;
   } catch (e) {
-    console.error("Erreur DuckDuckGo:", e);
+    console.error("Erreur DuckDuckGo API:", e);
     return [];
   }
 }
 
-// Fonction de recherche Tavily
+// Fonction Tavily API (prioritaire si la clé TAVILY_API_KEY est configurée)
 async function searchTavily(query, apiKey) {
   try {
     const response = await fetch('https://api.tavily.com/search', {
@@ -73,37 +66,44 @@ export default async function handler(req, res) {
 
   const lastUserMessage = messages[messages.length - 1]?.content || "";
   let searchContext = "";
+  let searchAttemptedAndFailed = false;
 
-  // RECHERCHE HYBRIDE : Tavily d'abord, puis DuckDuckGo si besoin
+  // LOGIQUE DE RECHERCHE WEB HYBRIDE
   if (webSearch) {
     let searchResults = [];
 
+    // 1. Priorité à Tavily si la clé existe dans Vercel
     if (tavilyApiKey) {
       searchResults = await searchTavily(lastUserMessage, tavilyApiKey);
     }
 
+    // 2. Si Tavily ne donne rien (ou si pas de clé), on passe sur DuckDuckGo
     if (searchResults.length === 0) {
-      console.log("[Octopus AI] Passage sur la recherche DuckDuckGo...");
       searchResults = await searchDuckDuckGo(lastUserMessage);
     }
 
     if (searchResults.length > 0) {
       searchContext = "\n\n[INFORMATIONS EN DIRECT DU WEB]:\n" + 
         searchResults.map((r, i) => `- Extrait ${i+1}: ${r.content}`).join("\n");
+    } else {
+      searchAttemptedAndFailed = true;
     }
   }
 
-  let systemContent = "Tu es Octopus AI, un assistant virtuel intelligent et connecté au Web.";
+  // DEFINITION DU RÔLE
+  let systemContent = "Tu es Octopus AI, un assistant virtuel intelligent.";
 
   if (mode === 'code') {
-    systemContent = `Tu es Octopus AI, un développeur Senior et architecte logiciel expert.
-- Fournis du code propre, moderne, optimisé et bien structuré.`;
+    systemContent = `Tu es Octopus AI, un développeur Senior et architecte logiciel expert. Fournis du code propre, moderne, optimisé et bien structuré.`;
   } else if (mode === 'writing') {
-    systemContent = `Tu es Octopus AI, un expert en rédaction et synthèses.`;
+    systemContent = `Tu es Octopus AI, un expert en rédaction et synthèses claires et structurées.`;
   }
 
+  // CONSIGNES DE RÉPONSE SANS DÉTOURS
   if (searchContext) {
-    systemContent += `\n\nTu disposes d'informations fraîches extraites du Web ci-dessous. Utilise-les pour répondre de façon précise et actualisée : ${searchContext}`;
+    systemContent += `\n${searchContext}\n\nCONSIGNE: Utilise les informations extraites du Web ci-dessus pour donner une réponse précise et actualisée à l'utilisateur.`;
+  } else if (searchAttemptedAndFailed) {
+    systemContent += `\n\nNOTE: La recherche Web a été lancée mais n'a renvoyé aucun résultat concret sur cette requête. Indique brièvement à l'utilisateur que la recherche Web n'a pas donné de résultats et réponds avec tes connaissances.`;
   }
 
   const systemMessage = { role: 'system', content: systemContent };
@@ -121,6 +121,7 @@ export default async function handler(req, res) {
     'gemma2-9b-it'
   ];
 
+  // APPEL À L'API GROQ
   for (const model of models) {
     try {
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -155,4 +156,5 @@ export default async function handler(req, res) {
   }
 
   return res.status(429).json({ error: "Service temporairement indisponible." });
-        }
+  }
+                
