@@ -1,17 +1,17 @@
 // api/lib/longTermMemory.js
 
 /**
- * Niveau 11 — Mémoire Longue Durée Dynamique via GitHub API
- * Lit et écrit les préférences/règles utilisateur dans `memory.json`.
+ * Niveau 11 — Mémoire Globale & Contextuelle de Session (GitHub API)
+ * Charge et sauvegarde la mémoire globale du projet et des échanges passés.
  */
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const GITHUB_REPO = process.env.GITHUB_REPO; // Exemple: "mon-pseudo/octopus2"
+const GITHUB_REPO = process.env.GITHUB_REPO; // Format: "user/repo"
 const GITHUB_BRANCH = process.env.GITHUB_BRANCH || "main";
 const FILE_PATH = "memory.json";
 
 /**
- * 1. Récupère toutes les préférences enregistrées dans memory.json
+ * 1. Charger la mémoire globale du projet / historique des sessions
  */
 export async function getLongTermMemory() {
   if (!GITHUB_TOKEN || !GITHUB_REPO) return "";
@@ -28,27 +28,36 @@ export async function getLongTermMemory() {
     if (!res.ok) return "";
 
     const data = await res.json();
-    // Décoder le contenu Base64 envoyé par GitHub
     const content = Buffer.from(data.content, 'base64').toString('utf-8');
-    const memories = JSON.parse(content || "[]");
+    const memoryData = JSON.parse(content || "{}");
 
-    if (!Array.isArray(memories) || memories.length === 0) return "";
+    if (!memoryData.summary && (!memoryData.contextNotes || memoryData.contextNotes.length === 0)) {
+      return "";
+    }
 
-    return `\n\n[MÉMOIRE LONGUE DURÉE RETENUE SUR L'UTILISATEUR]:\n${memories.map(m => `- ${m}`).join("\n")}`;
+    let memoryContext = "\n\n[MÉMOIRE GLOBALE ET CONTEXTE DES SESSIONS PRÉCÉDENTES]:";
+    if (memoryData.summary) {
+      memoryContext += `\n- Résumé global : ${memoryData.summary}`;
+    }
+    if (Array.isArray(memoryData.contextNotes) && memoryData.contextNotes.length > 0) {
+      memoryContext += `\n- Points clés retenus :\n  * ${memoryData.contextNotes.join("\n  * ")}`;
+    }
+
+    return memoryContext;
   } catch (e) {
-    console.error("Erreur lecture mémoire GitHub:", e);
+    console.error("Erreur lecture mémoire globale GitHub:", e);
     return "";
   }
 }
 
 /**
- * 2. Enregistre une nouvelle règle dans memory.json sur GitHub
+ * 2. Mettre à jour le résumé contextuel global sur GitHub
  */
-export async function saveMemory(fact) {
-  if (!GITHUB_TOKEN || !GITHUB_REPO || !fact) return false;
+export async function updateGlobalMemory(newSummary, newNotes = []) {
+  if (!GITHUB_TOKEN || !GITHUB_REPO) return false;
 
   try {
-    // Étape A : Récupérer le fichier actuel pour obtenir son contenu et son 'sha'
+    // Étape A : Récupérer le fichier actuel pour obtenir le SHA
     const getRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}?ref=${GITHUB_BRANCH}`, {
       headers: {
         'Authorization': `Bearer ${GITHUB_TOKEN}`,
@@ -57,26 +66,28 @@ export async function saveMemory(fact) {
       }
     });
 
-    let currentMemories = [];
     let sha = null;
+    let existingData = { summary: "", contextNotes: [] };
 
     if (getRes.ok) {
       const fileData = await getRes.json();
       sha = fileData.sha;
       const content = Buffer.from(fileData.content, 'base64').toString('utf-8');
-      currentMemories = JSON.parse(content || "[]");
+      try {
+        existingData = JSON.parse(content || "{}");
+      } catch (e) {}
     }
 
-    // Étape B : Éviter les doublons
-    if (!currentMemories.includes(fact)) {
-      currentMemories.push(fact);
-    } else {
-      return true; // Déjà enregistrée
-    }
+    // Étape B : Fusionner la mémoire
+    const updatedMemory = {
+      lastUpdated: new Date().toISOString(),
+      summary: newSummary || existingData.summary || "Projet en cours de développement.",
+      contextNotes: Array.from(new Set([...(existingData.contextNotes || []), ...newNotes])).slice(-15) // Conserve les 15 notes les plus récentes
+    };
 
-    // Étape C : Encoder le nouveau tableau en Base64 et effectuer le Commit sur GitHub
-    const updatedContent = Buffer.from(JSON.stringify(currentMemories, null, 2)).toString('base64');
+    const updatedContent = Buffer.from(JSON.stringify(updatedMemory, null, 2)).toString('base64');
 
+    // Étape C : Commit sur GitHub
     const putRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}`, {
       method: 'PUT',
       headers: {
@@ -85,7 +96,7 @@ export async function saveMemory(fact) {
         'User-Agent': 'Octopus2-App'
       },
       body: JSON.stringify({
-        message: `octo-memory: mise à jour des préférences`,
+        message: "octo-memory: mise à jour automatique de la mémoire globale",
         content: updatedContent,
         sha: sha || undefined,
         branch: GITHUB_BRANCH
@@ -94,8 +105,8 @@ export async function saveMemory(fact) {
 
     return putRes.ok;
   } catch (e) {
-    console.error("Erreur écriture mémoire GitHub:", e);
+    console.error("Erreur mise à jour mémoire globale GitHub:", e);
     return false;
   }
-      }
-      
+}
+  
