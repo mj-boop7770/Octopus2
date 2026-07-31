@@ -1,11 +1,12 @@
 import { createPlan } from './lib/planner.js';
+import { getProjectMemory } from './lib/memory.js';
 
 // Fonction de recherche Web via Tavily (Niveau 9 - Web Agent)
 async function searchTavily(query, apiKey) {
   if (!apiKey || !query.trim()) return [];
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // Timeout à 3 secondes
 
     const res = await fetch('https://api.tavily.com/search', {
       method: 'POST',
@@ -86,7 +87,10 @@ export default async function handler(req, res) {
     systemContent = "Tu es Octopus AI, un Code Reviewer rigoureux. Analyse le code soumis, repère les vulnérabilités, les problèmes de performance et propose des améliorations.";
   }
 
-  // Injection du plan d'action
+  // NIVEAU 2 : INJECTION DE LA MÉMOIRE DU PROJET
+  systemContent += `\n\n${getProjectMemory()}`;
+
+  // Injection du plan d'action (Niveau 1)
   systemContent += planContext;
 
   // Injection des données Web et règles anti-hallucination
@@ -147,5 +151,5 @@ export default async function handler(req, res) {
   }
 
   return res.status(500).json({ error: `Groq: ${lastErrorDetail || "Erreur de connexion"}` });
-  }
-                                  
+    }
+        
