@@ -1,12 +1,13 @@
 import { createPlan } from './lib/planner.js';
 import { getProjectMemory } from './lib/memory.js';
+import { getAgentPrompt } from './lib/specializedAgents.js';
 
 // Fonction de recherche Web via Tavily (Niveau 9 - Web Agent)
 async function searchTavily(query, apiKey) {
   if (!apiKey || !query.trim()) return [];
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000); // Timeout à 3 secondes
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
 
     const res = await fetch('https://api.tavily.com/search', {
       method: 'POST',
@@ -53,7 +54,6 @@ export default async function handler(req, res) {
   const activeAgent = planData.agent || mode || 'general';
   const planSteps = planData.steps || [];
 
-  // Formattage du plan pour l'injecter au modèle
   const planContext = planSteps.length > 0 
     ? `\n\n[PLAN D'ACTION A SUIVRE STRICTEMENT]:\n${planSteps.map((step, index) => `${index + 1}. ${step}`).join("\n")}`
     : "";
@@ -73,34 +73,24 @@ export default async function handler(req, res) {
   }
 
   // -------------------------------------------------------------
-  // CONFIGURATION DU SYSTEM PROMPT
+  // CONFIGURATION DES NIVEAUX (3, 5, 6, 7, 8) : AGENTS SPÉCIALISÉS
   // -------------------------------------------------------------
-  let systemContent = "Tu es Octopus AI, un assistant virtuel précis, direct et utile.";
-  
-  if (activeAgent === 'code') {
-    systemContent = "Tu es Octopus AI, un développeur et architecte logiciel Senior. Donne du code propre, moderne et optimisé.";
-  } else if (activeAgent === 'writing') {
-    systemContent = "Tu es Octopus AI, un expert en rédaction, structuration et analyse de texte.";
-  } else if (activeAgent === 'debug') {
-    systemContent = "Tu es Octopus AI, un expert en débogage. Analyse les erreurs, identifie la cause racine et fournis un correctif clair.";
-  } else if (activeAgent === 'review') {
-    systemContent = "Tu es Octopus AI, un Code Reviewer rigoureux. Analyse le code soumis, repère les vulnérabilités, les problèmes de performance et propose des améliorations.";
-  }
+  let systemContent = getAgentPrompt(activeAgent);
 
   // NIVEAU 2 : INJECTION DE LA MÉMOIRE DU PROJET
   systemContent += `\n\n${getProjectMemory()}`;
 
-  // Injection du plan d'action (Niveau 1)
+  // INJECTION DU PLAN D'ACTION (Niveau 1)
   systemContent += planContext;
 
-  // Injection des données Web et règles anti-hallucination
+  // RÈGLES WEB ET ANTI-HALLUCINATION
   if (webSearch && hasWebResults) {
     systemContent += `\n\n[RÉSULTATS DU WEB EN TEMPS RÉEL]:\n${searchContext}\n\nCONSIGNE STRICTE: Réponds à l'utilisateur uniquement en t'appuyant sur les données Web ci-dessus. Ne dis JAMAIS 'Je vais consulter' ou 'Je fais une pause'.`;
   } else if (webSearch && !hasWebResults) {
     systemContent += `\n\nCONSIGNE STRICTE: La recherche n'a pas renvoyé de résultats pertinents. Réponds directement avec tes connaissances générales. N'invente pas d'étapes de recherche.`;
   }
 
-  // Formattage de l'historique de conversation
+  // HISTORIQUE DE CONVERSATION
   const formattedMessages = messages.map(m => ({
     role: (m.role === 'bot' || m.role === 'assistant') ? 'assistant' : 'user',
     content: m.content
@@ -151,5 +141,5 @@ export default async function handler(req, res) {
   }
 
   return res.status(500).json({ error: `Groq: ${lastErrorDetail || "Erreur de connexion"}` });
-    }
-        
+}
+  
