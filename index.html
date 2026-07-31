@@ -1,104 +1,312 @@
-async function searchTavily(query, apiKey) {
-  if (!apiKey) return [];
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s max
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Octopus AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 h-[100dvh] flex overflow-hidden">
 
-    const res = await fetch('https://api.tavily.com/search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        api_key: apiKey,
-        query: query,
-        search_depth: "basic",
-        max_results: 3
-      }),
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
+  <!-- Overlay sombre Mobile -->
+  <div id="sidebar-overlay" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-30 hidden md:hidden transition-opacity"></div>
 
-    if (!res.ok) return [];
-    const data = await res.json();
-    return data.results || [];
-  } catch (e) {
-    return [];
-  }
-}
+  <!-- Sidebar Coulissante -->
+  <aside id="sidebar" class="fixed md:static inset-y-0 left-0 w-72 bg-slate-900 border-r border-slate-800/80 flex flex-col justify-between z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out">
+    <div class="p-4 flex flex-col h-full overflow-hidden">
+      
+      <!-- Logo -->
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-white shadow-lg text-lg">
+            🐙
+          </div>
+          <span class="font-bold text-lg tracking-wide text-white">Octopus AI</span>
+        </div>
+        <button id="close-sidebar-btn" class="md:hidden text-slate-400 hover:text-white p-2">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' });
+      <!-- Bouton Nouvelle Discussion -->
+      <button id="new-chat-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs py-2.5 px-4 rounded-xl font-semibold transition flex items-center justify-center gap-2 shadow-md mb-4">
+        <i class="fa-solid fa-plus text-xs"></i> Nouvelle Discussion
+      </button>
 
-  const { messages, mode, webSearch } = req.body;
-  if (!messages || !Array.isArray(messages) || messages.length === 0) {
-    return res.status(400).json({ error: 'Messages requis' });
-  }
+      <!-- Liste des discussions -->
+      <div class="flex-1 overflow-y-auto custom-scrollbar space-y-1.5 pr-1" id="chat-list"></div>
 
-  const apiKey = process.env.GROQ_API_KEY;
-  const tavilyApiKey = process.env.TAVILY_API_KEY;
+      <!-- Footer Sidebar -->
+      <div class="pt-3 mt-auto border-t border-slate-800/80 text-xs text-slate-500 flex justify-between items-center">
+        <span>Octopus Engine v2.0</span>
+        <span class="text-indigo-400 font-semibold flex items-center gap-1">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Online
+        </span>
+      </div>
+    </div>
+  </aside>
 
-  if (!apiKey) {
-    return res.status(500).json({ error: 'GROQ_API_KEY manquante dans Vercel' });
-  }
+  <!-- Zone Principale -->
+  <main class="flex-1 flex flex-col h-full w-full bg-slate-950 relative overflow-hidden">
+    
+    <!-- Header Chat -->
+    <header class="h-14 md:h-16 border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-md px-3 md:px-6 flex items-center justify-between z-20 shrink-0 gap-2">
+      <div class="flex items-center gap-2 shrink-0">
+        <button id="open-sidebar-btn" class="text-slate-300 hover:text-white p-2 rounded-xl bg-slate-800/80 border border-slate-700/50 hover:bg-slate-800 transition">
+          <i class="fa-solid fa-bars text-sm"></i>
+        </button>
+      </div>
 
-  const lastUserMessage = messages[messages.length - 1]?.content || "";
-  let searchContext = "";
+      <h1 class="hidden sm:block font-semibold text-slate-200 text-xs md:text-sm truncate max-w-[120px] md:max-w-md" id="current-chat-title">
+        Nouvelle Discussion
+      </h1>
 
-  // 1. RECHERCHE WEB TAVILY
-  if (webSearch && lastUserMessage.trim()) {
-    const results = await searchTavily(lastUserMessage, tavilyApiKey);
-    if (results.length > 0) {
-      searchContext = "\n\n[RÉSULTATS DE LA RECHERCHE WEB]:\n" + 
-        results.map((r, i) => `- Info ${i+1}: ${r.content || r.snippet}`).join("\n");
+      <div class="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto">
+        <button id="web-search-toggle" class="bg-slate-900 border border-slate-800 text-slate-300 text-[11px] md:text-xs px-2.5 py-1.5 rounded-xl font-medium flex items-center gap-1 transition">
+          <span>🌐</span>
+          <span id="web-status" class="text-red-400 font-bold">OFF</span>
+        </button>
+
+        <select id="mode-select" class="bg-slate-900 border border-slate-800 text-slate-300 text-[11px] md:text-xs rounded-xl px-2 py-1.5 focus:outline-none focus:border-indigo-500 font-medium">
+          <option value="general">🤖 Général</option>
+          <option value="code">💻 Code</option>
+          <option value="writing">📝 Rédaction</option>
+        </select>
+      </div>
+    </header>
+
+    <!-- Zone des messages -->
+    <div id="messages-container" class="flex-1 overflow-y-auto custom-scrollbar p-3 md:p-6 space-y-4 md:space-y-6 pb-4"></div>
+
+    <!-- Zone de Saisie -->
+    <div class="p-2.5 md:p-4 bg-slate-950 border-t border-slate-800/80 shrink-0">
+      <form id="chat-form" class="max-w-4xl mx-auto relative flex items-center">
+        <textarea id="user-input" rows="1" placeholder="Écris ton message..." class="w-full bg-slate-900 text-slate-100 placeholder-slate-500 text-xs md:text-sm rounded-xl pl-3.5 pr-11 py-3 border border-slate-800 focus:outline-none focus:border-indigo-500 resize-none max-h-28 shadow-lg transition custom-scrollbar"></textarea>
+        <button type="submit" id="send-btn" class="absolute right-2 p-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition shadow-md flex items-center justify-center w-7 h-7 md:w-8 md:h-8">
+          <i class="fa-solid fa-paper-plane text-xs"></i>
+        </button>
+      </form>
+    </div>
+  </main>
+
+  <script>
+    let chats = JSON.parse(localStorage.getItem('octopus_chats')) || [];
+    let currentChatId = null;
+    let isWebSearchActive = false;
+
+    const sidebar = document.getElementById('sidebar');
+    const sidebarOverlay = document.getElementById('sidebar-overlay');
+    const openSidebarBtn = document.getElementById('open-sidebar-btn');
+    const closeSidebarBtn = document.getElementById('close-sidebar-btn');
+    const chatListEl = document.getElementById('chat-list');
+    const messagesContainer = document.getElementById('messages-container');
+    const chatForm = document.getElementById('chat-form');
+    const userInput = document.getElementById('user-input');
+    const modeSelect = document.getElementById('mode-select');
+    const webToggle = document.getElementById('web-search-toggle');
+    const webStatus = document.getElementById('web-status');
+    const newChatBtn = document.getElementById('new-chat-btn');
+    const currentChatTitle = document.getElementById('current-chat-title');
+
+    function openSidebar() {
+      sidebar.classList.remove('-translate-x-full');
+      sidebarOverlay.classList.remove('hidden');
     }
-  }
 
-  // 2. CONFIGURATION DU SYSTEM PROMPT
-  let systemContent = "Tu es Octopus AI, un assistant virtuel intelligent et connecté au web.";
-  if (mode === 'code') systemContent = "Tu es Octopus AI, développeur et architecte logiciel senior.";
-  if (mode === 'writing') systemContent = "Tu es Octopus AI, expert en rédaction, analyse et synthèse.";
+    function closeSidebar() {
+      sidebar.classList.add('-translate-x-full');
+      sidebarOverlay.classList.add('hidden');
+    }
 
-  if (searchContext) {
-    systemContent += `\n${searchContext}\n\nCONSIGNE STRICTE: Réponds en t'appuyant directement sur les résultats du Web ci-dessus. N'invente rien.`;
-  }
+    openSidebarBtn.onclick = () => {
+      if (sidebar.classList.contains('-translate-x-full')) openSidebar();
+      else closeSidebar();
+    };
 
-  const formattedMessages = messages.map(m => ({
-    role: (m.role === 'bot' || m.role === 'assistant') ? 'assistant' : 'user',
-    content: m.content
-  }));
+    closeSidebarBtn.onclick = closeSidebar;
+    sidebarOverlay.onclick = closeSidebar;
 
-  const recentMessages = formattedMessages.slice(-4);
+    webToggle.onclick = () => {
+      isWebSearchActive = !isWebSearchActive;
+      webStatus.textContent = isWebSearchActive ? 'ON' : 'OFF';
+      webStatus.className = isWebSearchActive ? 'text-green-400 font-bold' : 'text-red-400';
+      webToggle.classList.toggle('border-indigo-500', isWebSearchActive);
+      webToggle.classList.toggle('bg-slate-800', isWebSearchActive);
+    };
 
-  // 3. MODÈLES NON-LLAMA SUR GROQ (Mixtral en priorité, Gemma en secours)
-  const models = [
-    'mixtral-8x7b-32768',
-    'gemma2-9b-it'
-  ];
+    function saveChats() {
+      localStorage.setItem('octopus_chats', JSON.stringify(chats));
+    }
 
-  for (const model of models) {
-    try {
-      const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: model,
-          messages: [{ role: 'system', content: systemContent }, ...recentMessages],
-          temperature: 0.3,
-          max_tokens: 2048
-        })
+    function createNewChat() {
+      const newChat = {
+        id: Date.now().toString(),
+        title: 'Nouvelle Discussion',
+        messages: []
+      };
+      chats.unshift(newChat);
+      currentChatId = newChat.id;
+      saveChats();
+      renderSidebar();
+      renderMessages();
+      if (window.innerWidth < 768) closeSidebar();
+    }
+
+    function renderSidebar() {
+      chatListEl.innerHTML = '';
+      chats.forEach(chat => {
+        const btn = document.createElement('div');
+        const isActive = chat.id === currentChatId;
+        btn.className = `p-2.5 rounded-xl text-xs font-medium cursor-pointer flex items-center justify-between group transition ${isActive ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'}`;
+        
+        btn.innerHTML = `
+          <div class="flex items-center gap-2 truncate">
+            <i class="fa-regular fa-message text-slate-500"></i>
+            <span class="truncate">${chat.title}</span>
+          </div>
+          <button onclick="deleteChat(event, '${chat.id}')" class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition p-1">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        `;
+        btn.onclick = (e) => {
+          if (!e.target.closest('button')) {
+            currentChatId = chat.id;
+            renderSidebar();
+            renderMessages();
+            if (window.innerWidth < 768) closeSidebar();
+          }
+        };
+        chatListEl.appendChild(btn);
+      });
+    }
+
+    function deleteChat(e, id) {
+      e.stopPropagation();
+      chats = chats.filter(c => c.id !== id);
+      if (currentChatId === id) {
+        currentChatId = chats.length > 0 ? chats[0].id : null;
+      }
+      saveChats();
+      if (!currentChatId) createNewChat();
+      else {
+        renderSidebar();
+        renderMessages();
+      }
+    }
+
+    function renderMessages() {
+      const current = chats.find(c => c.id === currentChatId);
+      if (!current) return;
+
+      if (currentChatTitle) currentChatTitle.textContent = current.title;
+
+      if (current.messages.length === 0) {
+        messagesContainer.innerHTML = `
+          <div class="h-full flex flex-col items-center justify-center text-center text-slate-500 my-auto px-4">
+            <div class="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-2xl md:text-3xl mb-3 shadow-inner">🐙</div>
+            <h2 class="text-base md:text-lg font-semibold text-slate-300 mb-1">Comment puis-je t'aider ?</h2>
+            <p class="text-xs max-w-xs text-slate-500">Pose une question, demande du code, ou active la recherche Web 🌐 pour des infos en direct.</p>
+          </div>
+        `;
+        return;
+      }
+
+      messagesContainer.innerHTML = '';
+      current.messages.forEach(m => {
+        const isUser = m.role === 'user';
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `flex gap-2.5 max-w-full md:max-w-3xl ${isUser ? 'ml-auto flex-row-reverse' : 'mr-auto'}`;
+        
+        msgDiv.innerHTML = `
+          <div class="w-7 h-7 md:w-8 md:h-8 rounded-xl flex items-center justify-center shrink-0 text-[10px] md:text-xs font-bold ${isUser ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-indigo-400 border border-slate-700'}">
+            ${isUser ? 'Vous' : '🐙'}
+          </div>
+          <div class="p-3 rounded-2xl text-xs md:text-sm leading-relaxed ${isUser ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-slate-900 text-slate-200 border border-slate-800 rounded-tl-none'} shadow-sm whitespace-pre-wrap break-words">${escapeHtml(m.content)}</div>
+        `;
+        messagesContainer.appendChild(msgDiv);
       });
 
-      const data = await groqRes.json();
-
-      if (groqRes.ok && data.choices?.[0]?.message?.content) {
-        return res.status(200).json({ reply: data.choices[0].message.content });
-      }
-    } catch (e) {
-      console.error(`Erreur avec le modèle ${model}:`, e);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
-  }
 
-  return res.status(500).json({ error: "Erreur de connexion au service IA." });
-}
+    function escapeHtml(text) {
+      return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    chatForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const content = userInput.value.trim();
+      if (!content) return;
+
+      if (!currentChatId) createNewChat();
+      const current = chats.find(c => c.id === currentChatId);
+
+      if (current.messages.length === 0) {
+        current.title = content.slice(0, 20) + (content.length > 20 ? '...' : '');
+      }
+
+      current.messages.push({ role: 'user', content });
+      userInput.value = '';
+      saveChats();
+      renderSidebar();
+      renderMessages();
+
+      const loadingDiv = document.createElement('div');
+      loadingDiv.className = 'flex gap-2.5 max-w-full md:max-w-3xl mr-auto';
+      loadingDiv.innerHTML = `
+        <div class="w-7 h-7 md:w-8 md:h-8 rounded-xl bg-slate-800 text-indigo-400 border border-slate-700 flex items-center justify-center shrink-0 text-[10px] font-bold">🐙</div>
+        <div class="p-3 rounded-2xl bg-slate-900 text-slate-400 text-xs border border-slate-800 flex items-center gap-2">
+          <i class="fa-solid fa-spinner fa-spin"></i> ${isWebSearchActive ? 'Recherche Tavily...' : 'Réflexion...'}
+        </div>
+      `;
+      messagesContainer.appendChild(loadingDiv);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: current.messages,
+            mode: modeSelect.value,
+            webSearch: isWebSearchActive
+          })
+        });
+
+        const data = await res.json();
+        loadingDiv.remove();
+
+        if (res.ok && data.reply) {
+          current.messages.push({ role: 'bot', content: data.reply });
+        } else {
+          current.messages.push({ role: 'bot', content: `⚠️ Erreur : ${data.error || 'Erreur de réponse'}` });
+        }
+      } catch (err) {
+        loadingDiv.remove();
+        current.messages.push({ role: 'bot', content: '⚠️ Erreur de connexion.' });
+      }
+
+      saveChats();
+      renderMessages();
+    };
+
+    newChatBtn.onclick = createNewChat;
+
+    if (chats.length === 0) createNewChat();
+    else {
+      currentChatId = chats[0].id;
+      renderSidebar();
+      renderMessages();
+    }
+  </script>
+</body>
+          </html>
+  
