@@ -1,8 +1,48 @@
-// Fonction DuckDuckGo (API publique, gratuite, sans clé API requis)
+// Fonction Tavily (Prioritaire avec TAVILY_API_KEY)
+async function searchTavily(query, apiKey) {
+  if (!apiKey) return [];
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 4000); // 4s max
+
+  try {
+    const response = await fetch('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: apiKey,
+        query: query,
+        search_depth: "basic",
+        max_results: 3
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      console.error("Erreur HTTP Tavily:", response.status);
+      return [];
+    }
+
+    const data = await response.json();
+    return data.results || [];
+  } catch (e) {
+    console.error("Erreur ou timeout Tavily:", e.message);
+    return [];
+  }
+}
+
+// Fonction DuckDuckGo (API publique de secours)
 async function searchDuckDuckGo(query) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3000);
+
   try {
     const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
     if (!response.ok) return [];
 
     const data = await response.json();
@@ -20,28 +60,6 @@ async function searchDuckDuckGo(query) {
 
     return results;
   } catch (e) {
-    console.error("Erreur DuckDuckGo API:", e);
-    return [];
-  }
-}
-
-// Fonction Tavily API (prioritaire si la clé TAVILY_API_KEY est configurée)
-async function searchTavily(query, apiKey) {
-  try {
-    const response = await fetch('https://api.tavily.com/search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        api_key: apiKey,
-        query: query,
-        search_depth: "basic",
-        max_results: 3
-      })
-    });
-    const data = await response.json();
-    return data.results || [];
-  } catch (e) {
-    console.error("Erreur Tavily:", e);
     return [];
   }
 }
@@ -66,44 +84,38 @@ export default async function handler(req, res) {
 
   const lastUserMessage = messages[messages.length - 1]?.content || "";
   let searchContext = "";
-  let searchAttemptedAndFailed = false;
 
-  // LOGIQUE DE RECHERCHE WEB HYBRIDE
+  // 1. EXECUTION DE LA RECHERCHE WEB
   if (webSearch) {
     let searchResults = [];
 
-    // 1. Priorité à Tavily si la clé existe dans Vercel
+    // Essai Tavily en premier
     if (tavilyApiKey) {
       searchResults = await searchTavily(lastUserMessage, tavilyApiKey);
     }
 
-    // 2. Si Tavily ne donne rien (ou si pas de clé), on passe sur DuckDuckGo
+    // Si Tavily ne renvoie rien, secours DuckDuckGo
     if (searchResults.length === 0) {
       searchResults = await searchDuckDuckGo(lastUserMessage);
     }
 
     if (searchResults.length > 0) {
-      searchContext = "\n\n[INFORMATIONS EN DIRECT DU WEB]:\n" + 
-        searchResults.map((r, i) => `- Extrait ${i+1}: ${r.content}`).join("\n");
-    } else {
-      searchAttemptedAndFailed = true;
+      searchContext = "\n\n[DONNÉES EN DIRECT DU WEB]:\n" + 
+        searchResults.map((r, i) => `- Info ${i+1}: ${r.content || r.snippet}`).join("\n");
     }
   }
 
-  // DEFINITION DU RÔLE
+  // 2. CONFIGURATION DU SYSTEM PROMPT
   let systemContent = "Tu es Octopus AI, un assistant virtuel intelligent.";
 
   if (mode === 'code') {
-    systemContent = `Tu es Octopus AI, un développeur Senior et architecte logiciel expert. Fournis du code propre, moderne, optimisé et bien structuré.`;
+    systemContent = `Tu es Octopus AI, un développeur Senior et architecte logiciel expert. Fournis du code propre et optimisé.`;
   } else if (mode === 'writing') {
-    systemContent = `Tu es Octopus AI, un expert en rédaction et synthèses claires et structurées.`;
+    systemContent = `Tu es Octopus AI, un expert en rédaction et synthèse.`;
   }
 
-  // CONSIGNES DE RÉPONSE SANS DÉTOURS
   if (searchContext) {
-    systemContent += `\n${searchContext}\n\nCONSIGNE: Utilise les informations extraites du Web ci-dessus pour donner une réponse précise et actualisée à l'utilisateur.`;
-  } else if (searchAttemptedAndFailed) {
-    systemContent += `\n\nNOTE: La recherche Web a été lancée mais n'a renvoyé aucun résultat concret sur cette requête. Indique brièvement à l'utilisateur que la recherche Web n'a pas donné de résultats et réponds avec tes connaissances.`;
+    systemContent += `\n${searchContext}\n\nCONSIGNE: Utilise les données du Web ci-dessus pour donner une réponse précise et actualisée.`;
   }
 
   const systemMessage = { role: 'system', content: systemContent };
@@ -121,7 +133,7 @@ export default async function handler(req, res) {
     'gemma2-9b-it'
   ];
 
-  // APPEL À L'API GROQ
+  // 3. ENVOI À GROQ
   for (const model of models) {
     try {
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -143,18 +155,11 @@ export default async function handler(req, res) {
       if (response.ok && data.choices?.[0]?.message?.content) {
         return res.status(200).json({ reply: data.choices[0].message.content });
       }
-
-      if ([429, 413, 400, 404].includes(response.status)) {
-        continue;
-      } else {
-        return res.status(500).json({ error: data.error?.message || 'Erreur API Groq' });
-      }
-
     } catch (error) {
-      console.error(`Erreur réseau avec le modèle ${model}:`, error);
+      console.error(`Erreur modèle ${model}:`, error);
     }
   }
 
-  return res.status(429).json({ error: "Service temporairement indisponible." });
-  }
-                
+  return res.status(500).json({ error: "Erreur de connexion au service IA." });
+}
+  
