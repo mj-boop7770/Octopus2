@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+t<!DOCTYPE html>
 <html lang="fr" class="dark">
 <head>
   <meta charset="UTF-8">
@@ -9,82 +9,102 @@
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     body { font-family: 'Inter', sans-serif; }
-    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar { width: 5px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 h-screen flex flex-col md:flex-row overflow-hidden">
+<body class="bg-slate-950 text-slate-100 h-screen flex overflow-hidden">
 
-  <!-- Sidebar -->
-  <aside id="sidebar" class="w-full md:w-80 bg-slate-900 border-b md:border-b-0 md:border-r border-slate-800 flex flex-col justify-between shrink-0 h-auto md:h-full">
+  <!-- Overlay Flou pour Mobile quand la Sidebar est ouverte -->
+  <div id="sidebar-overlay" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-30 hidden md:hidden transition-opacity"></div>
+
+  <!-- Sidebar Coulissante (Menu Tiroir) -->
+  <aside id="sidebar" class="fixed md:static inset-y-0 left-0 w-72 bg-slate-900 border-r border-slate-800/80 flex flex-col justify-between z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out">
     <div class="p-4 flex flex-col h-full overflow-hidden">
-      <!-- Header / Logo -->
+      
+      <!-- Top Sidebar (Logo + Fermer Mobile) -->
       <div class="flex items-center justify-between mb-4">
-        <div class="flex items-center gap-2">
-          <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/30">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/20 text-lg">
             🐙
           </div>
           <span class="font-bold text-lg tracking-wide text-white">Octopus AI</span>
         </div>
-        <button id="new-chat-btn" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-2 rounded-xl font-medium transition flex items-center gap-1 shadow-md">
-          <i class="fa-solid fa-plus"></i> Nouveau
+        <!-- Bouton Fermer (Mobile uniquement) -->
+        <button id="close-sidebar-btn" class="md:hidden text-slate-400 hover:text-white p-2">
+          <i class="fa-solid fa-xmark text-lg"></i>
         </button>
       </div>
 
+      <!-- Bouton Nouvelle Discussion -->
+      <button id="new-chat-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs py-2.5 px-4 rounded-xl font-semibold transition flex items-center justify-center gap-2 shadow-md shadow-indigo-600/20 mb-4">
+        <i class="fa-solid fa-plus text-xs"></i> Nouvelle Discussion
+      </button>
+
       <!-- Liste des discussions -->
-      <div class="flex-1 overflow-y-auto custom-scrollbar space-y-1 my-2" id="chat-list">
-        <!-- Généré dynamiquement -->
+      <div class="flex-1 overflow-y-auto custom-scrollbar space-y-1.5 pr-1" id="chat-list">
+        <!-- Contenu dynamique -->
       </div>
 
       <!-- Footer Sidebar -->
-      <div class="pt-3 border-t border-slate-800 text-xs text-slate-500 flex justify-between items-center">
+      <div class="pt-3 mt-auto border-t border-slate-800/80 text-xs text-slate-500 flex justify-between items-center">
         <span>Octopus Engine v2.0</span>
-        <span class="text-indigo-400 font-semibold">Web Enabled 🌐</span>
+        <span class="text-indigo-400 font-semibold flex items-center gap-1">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Online
+        </span>
       </div>
     </div>
   </aside>
 
-  <!-- Zone Principale -->
-  <main class="flex-1 flex flex-col h-full bg-slate-950 relative overflow-hidden">
+  <!-- Zone Principale (Chat) -->
+  <main class="flex-1 flex flex-col h-full w-full bg-slate-950 relative overflow-hidden">
     
     <!-- Header Chat -->
-    <header class="h-16 border-b border-slate-800 bg-slate-900/50 backdrop-blur-md px-6 flex items-center justify-between z-10">
-      <div class="flex items-center gap-3">
-        <h1 class="font-semibold text-slate-200" id="current-chat-title">Nouvelle Discussion</h1>
+    <header class="h-16 border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md px-4 md:px-6 flex items-center justify-between z-20 shrink-0">
+      
+      <!-- Gauche : Trois barres (Mobile & Desk) + Titre -->
+      <div class="flex items-center gap-3 overflow-hidden">
+        <button id="open-sidebar-btn" class="text-slate-300 hover:text-white p-2 rounded-xl bg-slate-800/60 border border-slate-700/50 hover:bg-slate-800 transition">
+          <i class="fa-solid fa-bars text-base"></i>
+        </button>
+        <h1 class="font-semibold text-slate-200 text-sm md:text-base truncate max-w-[150px] sm:max-w-xs md:max-w-md" id="current-chat-title">
+          Nouvelle Discussion
+        </h1>
       </div>
 
-      <div class="flex items-center gap-3">
-        <!-- Bouton recherche Web -->
-        <button id="web-search-toggle" class="bg-slate-900 border border-slate-800 text-slate-400 text-xs px-3 py-1.5 rounded-xl font-semibold flex items-center gap-1.5 transition hover:border-slate-700">
+      <!-- Droite : Web Toggle + Mode Select -->
+      <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+        <!-- Bouton Web Toggle -->
+        <button id="web-search-toggle" class="bg-slate-900 border border-slate-800 text-slate-400 text-xs px-2.5 sm:px-3 py-1.5 rounded-xl font-semibold flex items-center gap-1.5 transition hover:border-slate-700">
           <span>🌐 Web:</span>
           <span id="web-status" class="text-red-400 font-bold">OFF</span>
         </button>
 
-        <!-- Selecteur de Mode -->
-        <select id="mode-select" class="bg-slate-900 border border-slate-800 text-slate-300 text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:border-indigo-500 font-medium">
-          <option value="general">🤖 General</option>
+        <!-- Mode Selecteur -->
+        <select id="mode-select" class="bg-slate-900 border border-slate-800 text-slate-300 text-xs rounded-xl px-2.5 sm:px-3 py-1.5 focus:outline-none focus:border-indigo-500 font-medium">
+          <option value="general">🤖 Général</option>
           <option value="code">💻 Code</option>
           <option value="writing">📝 Rédaction</option>
         </select>
       </div>
     </header>
 
-    <!-- Zone des Messages -->
+    <!-- Zone d'affichage des messages -->
     <div id="messages-container" class="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-6">
       <div class="h-full flex flex-col items-center justify-center text-center text-slate-500 my-auto">
         <div class="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-3xl mb-4 shadow-inner">
           🐙
         </div>
-        <h2 class="text-lg font-medium text-slate-300 mb-1">Comment puis-je t'aider aujourd'hui ?</h2>
+        <h2 class="text-base sm:text-lg font-semibold text-slate-300 mb-1">Comment puis-je t'aider aujourd'hui ?</h2>
         <p class="text-xs max-w-sm text-slate-500">Pose-moi une question, demande du code, ou active la recherche Web 🌐 pour des infos en direct.</p>
       </div>
     </div>
 
-    <!-- Zone de Saisie -->
-    <div class="p-4 bg-slate-950 border-t border-slate-800/60">
+    <!-- Zone de Saisie du Message -->
+    <div class="p-3 sm:p-4 bg-slate-950 border-t border-slate-800/80 shrink-0">
       <form id="chat-form" class="max-w-4xl mx-auto relative flex items-center">
-        <textarea id="user-input" rows="1" placeholder="Écris ton message à Octopus AI..." class="w-full bg-slate-900 text-slate-100 placeholder-slate-500 text-sm rounded-2xl pl-4 pr-12 py-3.5 border border-slate-800 focus:outline-none focus:border-indigo-500 resize-none max-h-32 shadow-lg transition"></textarea>
+        <textarea id="user-input" rows="1" placeholder="Écris ton message à Octopus AI..." class="w-full bg-slate-900 text-slate-100 placeholder-slate-500 text-sm rounded-2xl pl-4 pr-12 py-3.5 border border-slate-800 focus:outline-none focus:border-indigo-500 resize-none max-h-32 shadow-lg transition custom-scrollbar"></textarea>
         <button type="submit" id="send-btn" class="absolute right-2.5 p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition shadow-md flex items-center justify-center w-8 h-8">
           <i class="fa-solid fa-paper-plane text-xs"></i>
         </button>
@@ -98,13 +118,45 @@
     let currentChatId = null;
     let isWebSearchActive = false;
 
-    // Element DOM
+    // Éléments du DOM
+    const sidebar = document.getElementById('sidebar');
+    const sidebarOverlay = document.getElementById('sidebar-overlay');
+    const openSidebarBtn = document.getElementById('open-sidebar-btn');
+    const closeSidebarBtn = document.getElementById('close-sidebar-btn');
+    
     const chatListEl = document.getElementById('chat-list');
     const messagesContainer = document.getElementById('messages-container');
     const chatForm = document.getElementById('chat-form');
     const userInput = document.getElementById('user-input');
     const modeSelect = document.getElementById('mode-select');
     const webToggle = document.getElementById('web-search-toggle');
+    const webStatus = document.getElementById('web-status');
+    const newChatBtn = document.getElementById('new-chat-btn');
+    const currentChatTitle = document.getElementById('current-chat-title');
+
+    // --- GESTION DU MENU TROIS BARRES (SIDEBAR SLIDE) ---
+    function openSidebar() {
+      sidebar.classList.remove('-translate-x-full');
+      sidebarOverlay.classList.remove('hidden');
+    }
+
+    function closeSidebar() {
+      sidebar.classList.add('-translate-x-full');
+      sidebarOverlay.classList.add('hidden');
+    }
+
+    openSidebarBtn.onclick = () => {
+      if (sidebar.classList.contains('-translate-x-full')) {
+        openSidebar();
+      } else {
+        closeSidebar();
+      }
+    };
+
+    closeSidebarBtn.onclick = closeSidebar;
+    sidebarOverlay.onclick = closeSidebar;
+
+    // --- RECHERCHE WEB TOGGLE ---
     webToggle.onclick = () => {
       isWebSearchActive = !isWebSearchActive;
       webStatus.textContent = isWebSearchActive ? 'ON' : 'OFF';
@@ -112,19 +164,8 @@
       webToggle.classList.toggle('border-indigo-500', isWebSearchActive);
       webToggle.classList.toggle('bg-slate-800', isWebSearchActive);
     };
-    const webStatus = document.getElementById('web-status');
-    const newChatBtn = document.getElementById('new-chat-btn');
-    const currentChatTitle = document.getElementById('current-chat-title');
 
-    // --- GESTION RECHERCHE WEB TOGGLE ---
-    webToggle.onclick = () => {
-      isWebSearchActive = !isWebSearchActive;
-      webStatus.textContent = isWebSearchActive ? 'ON' : 'OFF';
-      webStatus.className = isWebSearchActive ? 'text-green-400 font-bold' : 'text-red-400';
-      webToggle.classList.toggle('border-indigo-500', isWebSearchActive);
-    };
-
-    // --- GESTION DES CHATS ---
+    // --- LOCAL STORAGE & HISTORIQUE ---
     function saveChats() {
       localStorage.setItem('octopus_chats', JSON.stringify(chats));
     }
@@ -140,6 +181,7 @@
       saveChats();
       renderSidebar();
       renderMessages();
+      if (window.innerWidth < 768) closeSidebar();
     }
 
     function renderSidebar() {
@@ -163,6 +205,7 @@
             currentChatId = chat.id;
             renderSidebar();
             renderMessages();
+            if (window.innerWidth < 768) closeSidebar();
           }
         };
         chatListEl.appendChild(btn);
@@ -193,7 +236,7 @@
         messagesContainer.innerHTML = `
           <div class="h-full flex flex-col items-center justify-center text-center text-slate-500 my-auto">
             <div class="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-3xl mb-4 shadow-inner">🐙</div>
-            <h2 class="text-lg font-medium text-slate-300 mb-1">Comment puis-je t'aider aujourd'hui ?</h2>
+            <h2 class="text-base sm:text-lg font-semibold text-slate-300 mb-1">Comment puis-je t'aider aujourd'hui ?</h2>
             <p class="text-xs max-w-sm text-slate-500">Pose-moi une question, demande du code, ou active la recherche Web 🌐 pour des infos en direct.</p>
           </div>
         `;
@@ -222,7 +265,7 @@
       return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
 
-    // --- SOUMISSION DE MESSAGE ---
+    // --- ENVOI DU MESSAGE ---
     chatForm.onsubmit = async (e) => {
       e.preventDefault();
       const content = userInput.value.trim();
@@ -231,19 +274,17 @@
       if (!currentChatId) createNewChat();
       const current = chats.find(c => c.id === currentChatId);
 
-      // Met à jour le titre au 1er message
       if (current.messages.length === 0) {
-        current.title = content.slice(0, 25) + (content.length > 25 ? '...' : '');
+        current.title = content.slice(0, 22) + (content.length > 22 ? '...' : '');
       }
 
-      // Ajout message utilisateur
       current.messages.push({ role: 'user', content });
       userInput.value = '';
       saveChats();
       renderSidebar();
       renderMessages();
 
-      // Indicateur de chargement
+      // Message d'attente
       const loadingDiv = document.createElement('div');
       loadingDiv.className = 'flex gap-3 max-w-3xl mr-auto';
       loadingDiv.innerHTML = `
@@ -294,4 +335,5 @@
     }
   </script>
 </body>
-</html>
+  </html>
+      
