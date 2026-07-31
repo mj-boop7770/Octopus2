@@ -1,9 +1,11 @@
-// Function de recherche Web via Tavily
+import { createPlan } from './lib/planner.js';
+
+// Fonction de recherche Web via Tavily (Niveau 9 - Web Agent)
 async function searchTavily(query, apiKey) {
   if (!apiKey || !query.trim()) return [];
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000); // Timeout à 3 secondes
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
 
     const res = await fetch('https://api.tavily.com/search', {
       method: 'POST',
@@ -42,26 +44,50 @@ export default async function handler(req, res) {
   }
 
   const lastUserMessage = messages[messages.length - 1]?.content || "";
+
+  // -------------------------------------------------------------
+  // NIVEAU 1 : EXECUTION DU PLANNER
+  // -------------------------------------------------------------
+  const planData = await createPlan(lastUserMessage, apiKey);
+  const activeAgent = planData.agent || mode || 'general';
+  const planSteps = planData.steps || [];
+
+  // Formattage du plan pour l'injecter au modèle
+  const planContext = planSteps.length > 0 
+    ? `\n\n[PLAN D'ACTION A SUIVRE STRICTEMENT]:\n${planSteps.map((step, index) => `${index + 1}. ${step}`).join("\n")}`
+    : "";
+
+  // -------------------------------------------------------------
+  // NIVEAU 9 : WEB AGENT (RECHERCHE TAVILY)
+  // -------------------------------------------------------------
   let searchContext = "";
   let hasWebResults = false;
 
-  // 1. EXECUTION DE LA RECHERCHE WEB (SI ACTIVÉE)
   if (webSearch && lastUserMessage.trim()) {
     const results = await searchTavily(lastUserMessage, tavilyApiKey);
     if (results && results.length > 0) {
       hasWebResults = true;
-      searchContext = results.map((r, i) => `- [${r.title || 'Source'}]: ${r.content || r.snippet}`).join("\n");
+      searchContext = results.map((r) => `- [${r.title || 'Source'}]: ${r.content || r.snippet}`).join("\n");
     }
   }
 
-  // 2. CONFIGURATION DU SYSTEM PROMPT
+  // -------------------------------------------------------------
+  // CONFIGURATION DU SYSTEM PROMPT
+  // -------------------------------------------------------------
   let systemContent = "Tu es Octopus AI, un assistant virtuel précis, direct et utile.";
   
-  if (mode === 'code') {
+  if (activeAgent === 'code') {
     systemContent = "Tu es Octopus AI, un développeur et architecte logiciel Senior. Donne du code propre, moderne et optimisé.";
-  } else if (mode === 'writing') {
+  } else if (activeAgent === 'writing') {
     systemContent = "Tu es Octopus AI, un expert en rédaction, structuration et analyse de texte.";
+  } else if (activeAgent === 'debug') {
+    systemContent = "Tu es Octopus AI, un expert en débogage. Analyse les erreurs, identifie la cause racine et fournis un correctif clair.";
+  } else if (activeAgent === 'review') {
+    systemContent = "Tu es Octopus AI, un Code Reviewer rigoureux. Analyse le code soumis, repère les vulnérabilités, les problèmes de performance et propose des améliorations.";
   }
+
+  // Injection du plan d'action
+  systemContent += planContext;
 
   // Injection des données Web et règles anti-hallucination
   if (webSearch && hasWebResults) {
@@ -76,10 +102,8 @@ export default async function handler(req, res) {
     content: m.content
   }));
 
-  // Limitation aux 4 derniers messages pour préserver la vitesse
   const recentMessages = formattedMessages.slice(-4);
 
-  // Modèles Groq officiels et actifs
   const models = [
     'llama-3.1-8b-instant',
     'llama-3.3-70b-versatile'
@@ -87,7 +111,9 @@ export default async function handler(req, res) {
 
   let lastErrorDetail = "";
 
-  // 3. APPEL A L'API GROQ AVEC FALLBACK
+  // -------------------------------------------------------------
+  // GENERATION DE LA REPONSE FINALE VIA GROQ
+  // -------------------------------------------------------------
   for (const model of models) {
     try {
       const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -107,7 +133,11 @@ export default async function handler(req, res) {
       const data = await groqRes.json();
 
       if (groqRes.ok && data.choices?.[0]?.message?.content) {
-        return res.status(200).json({ reply: data.choices[0].message.content });
+        return res.status(200).json({ 
+          reply: data.choices[0].message.content,
+          plan: planSteps,
+          agentUsed: activeAgent
+        });
       } else {
         lastErrorDetail = data.error?.message || JSON.stringify(data);
       }
@@ -117,4 +147,5 @@ export default async function handler(req, res) {
   }
 
   return res.status(500).json({ error: `Groq: ${lastErrorDetail || "Erreur de connexion"}` });
-        }
+  }
+                                  
