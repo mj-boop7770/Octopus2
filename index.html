@@ -1,435 +1,297 @@
 <!DOCTYPE html>
 <html lang="fr" class="dark">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Octopus AI</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    .no-scrollbar::-webkit-scrollbar { display: none; }
-    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    #chat-box::-webkit-scrollbar { width: 4px; }
-    #chat-box::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 9999px; }
-    pre { position: relative; padding-top: 2.5rem !important; }
-    .copy-code-btn {
-      position: absolute;
-      top: 0.5rem;
-      right: 0.5rem;
-      background: #334155;
-      color: #cbd5e1;
-      font-size: 0.7rem;
-      padding: 0.25rem 0.5rem;
-      border-radius: 0.375rem;
-      border: 1px solid #475569;
-      cursor: pointer;
-    }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
   </style>
 </head>
-<body class="bg-[#030712] text-slate-100 font-sans h-[100dvh] w-screen flex flex-col overflow-hidden">
+<body class="bg-slate-950 text-slate-100 h-screen flex flex-col md:flex-row overflow-hidden">
 
-  <!-- OVERLAY SIDEBAR MOBILE -->
-  <div id="sidebar-overlay" class="fixed inset-0 bg-black/60 z-40 hidden backdrop-blur-sm"></div>
-
-  <!-- SIDEBAR HISTORIQUE -->
-  <aside id="sidebar" class="fixed inset-y-0 left-0 w-72 bg-[#090d16] border-r border-slate-800/80 p-4 z-50 transform -translate-x-full transition-transform duration-300 flex flex-col justify-between shadow-2xl">
-    <div>
-      <div class="flex justify-between items-center mb-6 border-b border-slate-800/80 pb-3">
-        <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
-          <span>🐙</span> Octopus AI
-        </h2>
-        <button id="close-sidebar-btn" class="text-slate-400 hover:text-white text-xl p-1">✕</button>
+  <!-- Sidebar -->
+  <aside id="sidebar" class="w-full md:w-80 bg-slate-900 border-b md:border-b-0 md:border-r border-slate-800 flex flex-col justify-between shrink-0 h-auto md:h-full">
+    <div class="p-4 flex flex-col h-full overflow-hidden">
+      <!-- Header / Logo -->
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/30">
+            🐙
+          </div>
+          <span class="font-bold text-lg tracking-wide text-white">Octopus AI</span>
+        </div>
+        <button id="new-chat-btn" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-2 rounded-xl font-medium transition flex items-center gap-1 shadow-md">
+          <i class="fa-solid fa-plus"></i> Nouveau
+        </button>
       </div>
 
-      <button id="new-chat-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 mb-6 shadow-lg shadow-indigo-600/20 transition active:scale-[0.98]">
-        <span class="text-lg">+</span> Nouvelle discussion
-      </button>
-
-      <div class="space-y-2">
-        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider px-1">Historique</p>
-        <div id="history-list" class="space-y-1 max-h-[55vh] overflow-y-auto pr-1"></div>
+      <!-- Liste des discussions -->
+      <div class="flex-1 overflow-y-auto custom-scrollbar space-y-1 my-2" id="chat-list">
+        <!-- Généré dynamiquement -->
       </div>
-    </div>
 
-    <div class="text-xs text-slate-500 text-center border-t border-slate-800/80 pt-3">
-      Octopus AI v3.0 (Mémoire activée)
+      <!-- Footer Sidebar -->
+      <div class="pt-3 border-t border-slate-800 text-xs text-slate-500 flex justify-between items-center">
+        <span>Octopus Engine v2.0</span>
+        <span class="text-indigo-400 font-semibold">Web Enabled 🌐</span>
+      </div>
     </div>
   </aside>
 
-  <!-- HEADER -->
-  <header class="bg-[#090d16] border-b border-slate-800/80 px-4 py-3 flex-none flex items-center justify-between shadow-md z-10">
-    <div class="flex items-center gap-3">
-      <button id="open-sidebar-btn" class="p-2 rounded-xl bg-slate-900 border border-slate-800 text-indigo-400 hover:bg-slate-800 transition focus:outline-none">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-        </svg>
-      </button>
-      <div class="flex items-center gap-2">
-        <span class="text-2xl">🐙</span>
-        <h1 class="font-bold text-lg text-slate-100 tracking-wide">Octopus <span class="text-indigo-400">AI</span></h1>
+  <!-- Zone Principale -->
+  <main class="flex-1 flex flex-col h-full bg-slate-950 relative overflow-hidden">
+    
+    <!-- Header Chat -->
+    <header class="h-16 border-b border-slate-800 bg-slate-900/50 backdrop-blur-md px-6 flex items-center justify-between z-10">
+      <div class="flex items-center gap-3">
+        <h1 class="font-semibold text-slate-200" id="current-chat-title">Nouvelle Discussion</h1>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <!-- Bouton recherche Web -->
+        <button id="web-search-toggle" class="bg-slate-900 border border-slate-800 text-slate-400 text-xs px-3 py-1.5 rounded-xl font-semibold flex items-center gap-1.5 transition hover:border-slate-700">
+          <span>🌐 Web:</span>
+          <span id="web-status" class="text-red-400 font-bold">OFF</span>
+        </button>
+
+        <!-- Selecteur de Mode -->
+        <select id="mode-select" class="bg-slate-900 border border-slate-800 text-slate-300 text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:border-indigo-500 font-medium">
+          <option value="general">🤖 General</option>
+          <option value="code">💻 Code</option>
+          <option value="writing">📝 Rédaction</option>
+        </select>
+      </div>
+    </header>
+
+    <!-- Zone des Messages -->
+    <div id="messages-container" class="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-6">
+      <div class="h-full flex flex-col items-center justify-center text-center text-slate-500 my-auto">
+        <div class="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-3xl mb-4 shadow-inner">
+          🐙
+        </div>
+        <h2 class="text-lg font-medium text-slate-300 mb-1">Comment puis-je t'aider aujourd'hui ?</h2>
+        <p class="text-xs max-w-sm text-slate-500">Pose-moi une question, demande du code, ou active la recherche Web 🌐 pour des infos en direct.</p>
       </div>
     </div>
 
-    <div class="flex items-center gap-2">
-      <select id="mode-select" class="bg-slate-900 border border-slate-800 text-indigo-300 text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none">
-        <option value="general">🌐 Général</option>
-        <option value="code">💻 Code & Dev</option>
-        <option value="writing">✍️ Rédaction</option>
-      </select>
+    <!-- Zone de Saisie -->
+    <div class="p-4 bg-slate-950 border-t border-slate-800/60">
+      <form id="chat-form" class="max-w-4xl mx-auto relative flex items-center">
+        <textarea id="user-input" rows="1" placeholder="Écris ton message à Octopus AI..." class="w-full bg-slate-900 text-slate-100 placeholder-slate-500 text-sm rounded-2xl pl-4 pr-12 py-3.5 border border-slate-800 focus:outline-none focus:border-indigo-500 resize-none max-h-32 shadow-lg transition"></textarea>
+        <button type="submit" id="send-btn" class="absolute right-2.5 p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition shadow-md flex items-center justify-center w-8 h-8">
+          <i class="fa-solid fa-paper-plane text-xs"></i>
+        </button>
+      </form>
     </div>
-  </header>
-
-  <!-- ZONE DE CHAT -->
-  <main id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-4"></main>
-
-  <!-- FOOTER ET SAISIE -->
-  <footer class="bg-[#090d16] border-t border-slate-800/80 p-3 space-y-3 flex-none z-10">
-    
-    <!-- RACCOURCIS SLIDABLES -->
-    <div class="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs">
-      <button class="shortcut-btn shrink-0 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 px-3 py-1.5 rounded-xl transition" data-prompt="Trouve et corrige le bug dans ce code :">
-        🐛 Débugger
-      </button>
-      <button class="shortcut-btn shrink-0 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 px-3 py-1.5 rounded-xl transition" data-prompt="Optimise ce code pour le rendre plus rapide :">
-        🚀 Optimiser
-      </button>
-      <button class="shortcut-btn shrink-0 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 px-3 py-1.5 rounded-xl transition" data-prompt="Explique-moi ce code en détail :">
-        📝 Expliquer
-      </button>
-    </div>
-
-    <!-- PREVIEW FICHIER / SCREENSHOT JOINT -->
-    <div id="file-preview" class="hidden flex items-center justify-between bg-slate-900 border border-indigo-500/40 px-3 py-1.5 rounded-xl text-xs text-indigo-300">
-      <span id="file-name" class="truncate max-w-[200px]">📎 Fichier prêt</span>
-      <button id="remove-file" class="text-slate-400 hover:text-red-400 font-bold ml-2">✕</button>
-    </div>
-
-    <!-- CHAMP SAISIE -->
-    <form id="chat-form" class="max-w-4xl mx-auto flex items-center gap-2 bg-[#030712] border border-indigo-900/40 rounded-2xl p-2 focus-within:border-indigo-500 transition shadow-lg">
-      
-      <!-- BOUTON TROMBONE -->
-      <label for="file-input" class="cursor-pointer text-slate-400 hover:text-indigo-400 p-2 transition shrink-0">
-        📎
-        <input type="file" id="file-input" class="hidden" accept="image/*,.txt,.js,.html,.css,.json,.py,.java,.c,.cpp"/>
-      </label>
-
-      <input 
-        type="text" 
-        id="user-input" 
-        placeholder="Pose une question ou colle une image/code..." 
-        autocomplete="off"
-        class="flex-1 bg-transparent text-slate-100 placeholder-slate-500 text-sm focus:outline-none px-1"
-      />
-      <button 
-        type="submit" 
-        class="bg-indigo-600 hover:bg-indigo-500 text-white p-2.5 rounded-xl transition shrink-0 font-bold active:scale-95"
-      >
-        ➔
-      </button>
-    </form>
-  </footer>
+  </main>
 
   <script>
-    const chatBox = document.getElementById('chat-box');
+    // --- ÉTATS GLOBAUX ---
+    let chats = JSON.parse(localStorage.getItem('octopus_chats')) || [];
+    let currentChatId = null;
+    let isWebSearchActive = false;
+
+    // Element DOM
+    const chatListEl = document.getElementById('chat-list');
+    const messagesContainer = document.getElementById('messages-container');
     const chatForm = document.getElementById('chat-form');
     const userInput = document.getElementById('user-input');
     const modeSelect = document.getElementById('mode-select');
-    
-    const fileInput = document.getElementById('file-input');
-    const filePreview = document.getElementById('file-preview');
-    const fileName = document.getElementById('file-name');
-    const removeFileBtn = document.getElementById('remove-file');
-
-    const sidebar = document.getElementById('sidebar');
-    const sidebarOverlay = document.getElementById('sidebar-overlay');
-    const openSidebarBtn = document.getElementById('open-sidebar-btn');
-    const closeSidebarBtn = document.getElementById('close-sidebar-btn');
+    const webToggle = document.getElementById('web-search-toggle');
+    webToggle.onclick = () => {
+      isWebSearchActive = !isWebSearchActive;
+      webStatus.textContent = isWebSearchActive ? 'ON' : 'OFF';
+      webStatus.className = isWebSearchActive ? 'text-green-400 font-bold' : 'text-red-400';
+      webToggle.classList.toggle('border-indigo-500', isWebSearchActive);
+      webToggle.classList.toggle('bg-slate-800', isWebSearchActive);
+    };
+    const webStatus = document.getElementById('web-status');
     const newChatBtn = document.getElementById('new-chat-btn');
-    const historyList = document.getElementById('history-list');
+    const currentChatTitle = document.getElementById('current-chat-title');
 
-    let sessions = [];
-    try {
-      const saved = localStorage.getItem('octopus_sessions');
-      sessions = saved ? JSON.parse(saved) : [];
-      if (!Array.isArray(sessions)) sessions = [];
-    } catch(e) { sessions = []; }
+    // --- GESTION RECHERCHE WEB TOGGLE ---
+    webToggle.onclick = () => {
+      isWebSearchActive = !isWebSearchActive;
+      webStatus.textContent = isWebSearchActive ? 'ON' : 'OFF';
+      webStatus.className = isWebSearchActive ? 'text-green-400 font-bold' : 'text-red-400';
+      webToggle.classList.toggle('border-indigo-500', isWebSearchActive);
+    };
 
-    let currentSessionId = localStorage.getItem('octopus_current_session') || null;
-    let attachedFileContent = "";
-
-    function saveToStorage() {
-      localStorage.setItem('octopus_sessions', JSON.stringify(sessions));
-      localStorage.setItem('octopus_current_session', currentSessionId || '');
+    // --- GESTION DES CHATS ---
+    function saveChats() {
+      localStorage.setItem('octopus_chats', JSON.stringify(chats));
     }
 
-    function getCurrentSession() {
-      return sessions.find(s => s.id === currentSessionId);
-    }
-
-    function createNewSession() {
-      const newSession = {
+    function createNewChat() {
+      const newChat = {
         id: Date.now().toString(),
-        title: 'Nouvelle discussion',
+        title: 'Nouvelle Discussion',
         messages: []
       };
-      sessions.unshift(newSession);
-      currentSessionId = newSession.id;
-      saveToStorage();
-      renderHistoryList();
-      renderCurrentSession();
-      closeSidebar();
+      chats.unshift(newChat);
+      currentChatId = newChat.id;
+      saveChats();
+      renderSidebar();
+      renderMessages();
     }
 
-    function deleteSession(id, e) {
+    function renderSidebar() {
+      chatListEl.innerHTML = '';
+      chats.forEach(chat => {
+        const btn = document.createElement('div');
+        const isActive = chat.id === currentChatId;
+        btn.className = `p-2.5 rounded-xl text-xs font-medium cursor-pointer flex items-center justify-between group transition ${isActive ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'}`;
+        
+        btn.innerHTML = `
+          <div class="flex items-center gap-2 truncate">
+            <i class="fa-regular fa-message text-slate-500"></i>
+            <span class="truncate">${chat.title}</span>
+          </div>
+          <button onclick="deleteChat(event, '${chat.id}')" class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition p-1">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        `;
+        btn.onclick = (e) => {
+          if (!e.target.closest('button')) {
+            currentChatId = chat.id;
+            renderSidebar();
+            renderMessages();
+          }
+        };
+        chatListEl.appendChild(btn);
+      });
+    }
+
+    function deleteChat(e, id) {
       e.stopPropagation();
-      sessions = sessions.filter(s => s.id !== id);
-      if (currentSessionId === id) {
-        currentSessionId = sessions.length > 0 ? sessions[0].id : null;
+      chats = chats.filter(c => c.id !== id);
+      if (currentChatId === id) {
+        currentChatId = chats.length > 0 ? chats[0].id : null;
       }
-      saveToStorage();
-      renderHistoryList();
-      renderCurrentSession();
-    }
-
-    // SIDEBAR TOGGLE
-    function openSidebar() {
-      sidebar.classList.remove('-translate-x-full');
-      sidebarOverlay.classList.remove('hidden');
-    }
-    function closeSidebar() {
-      sidebar.classList.add('-translate-x-full');
-      sidebarOverlay.classList.add('hidden');
-    }
-    openSidebarBtn.onclick = openSidebar;
-    closeSidebarBtn.onclick = closeSidebar;
-    sidebarOverlay.onclick = closeSidebar;
-    newChatBtn.onclick = createNewSession;
-
-    // RENDU HISTORIQUE
-    function renderHistoryList() {
-      historyList.innerHTML = '';
-      if (sessions.length === 0) {
-        historyList.innerHTML = `<p class="text-xs text-slate-500 italic px-2">Aucune discussion</p>`;
-        return;
-      }
-      sessions.forEach(s => {
-        const isActive = s.id === currentSessionId;
-        const item = document.createElement('div');
-        item.className = `flex items-center justify-between p-2.5 rounded-xl cursor-pointer text-sm transition ${
-          isActive ? 'bg-indigo-600/20 text-indigo-300 font-medium border border-indigo-500/30' : 'text-slate-400 hover:bg-slate-800'
-        }`;
-        item.onclick = () => {
-          currentSessionId = s.id;
-          saveToStorage();
-          renderHistoryList();
-          renderCurrentSession();
-          closeSidebar();
-        };
-        item.innerHTML = `
-          <div class="flex items-center gap-2 truncate max-w-[150px]">
-            <span>💬</span> <span class="truncate">${s.title}</span>
-          </div>
-          <button class="delete-btn text-slate-500 hover:text-red-400 px-1">✕</button>
-        `;
-        item.querySelector('.delete-btn').onclick = (e) => deleteSession(s.id, e);
-        historyList.appendChild(item);
-      });
-    }
-
-    // LECTURE DE FICHIERS / SCREENSHOTS (OCR)
-    fileInput.onchange = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      fileName.textContent = `⏳ Lecture de ${file.name}...`;
-      filePreview.classList.remove('hidden');
-
-      if (file.type.startsWith('image/')) {
-        try {
-          const result = await Tesseract.recognize(file, 'eng+fra');
-          attachedFileContent = `\n\n[Texte extrait du Screenshot / Image]:\n${result.data.text}`;
-          fileName.textContent = `🖼️ Screenshot : ${file.name}`;
-        } catch(err) {
-          alert("Impossible de lire l'image.");
-          removeFileBtn.click();
-        }
-      } else {
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-          attachedFileContent = `\n\n[Contenu du fichier ${file.name}]:\n${evt.target.result}`;
-          fileName.textContent = `📄 Fichier : ${file.name}`;
-        };
-        reader.readAsText(file);
-      }
-    };
-
-    removeFileBtn.onclick = () => {
-      fileInput.value = '';
-      attachedFileContent = '';
-      filePreview.classList.add('hidden');
-    };
-
-    // LECTURE AUDIO
-    function speakText(text) {
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        const cleanText = text.replace(/<[^>]*>/g, '').replace(/[*_#`]/g, '');
-        const u = new SpeechSynthesisUtterance(cleanText);
-        u.lang = 'fr-FR';
-        window.speechSynthesis.speak(u);
+      saveChats();
+      if (!currentChatId) createNewChat();
+      else {
+        renderSidebar();
+        renderMessages();
       }
     }
 
-    // BOUTONS COPIER CODE
-    function setupCodeCopyButtons(container) {
-      container.querySelectorAll('pre').forEach(pre => {
-        if (pre.querySelector('.copy-code-btn')) return;
-        const btn = document.createElement('button');
-        btn.className = 'copy-code-btn';
-        btn.textContent = 'Copier';
-        btn.onclick = () => {
-          const codeText = pre.querySelector('code')?.innerText || pre.innerText;
-          navigator.clipboard.writeText(codeText);
-          btn.textContent = 'Copié !';
-          setTimeout(() => btn.textContent = 'Copier', 2000);
-        };
-        pre.appendChild(btn);
-      });
-    }
+    function renderMessages() {
+      const current = chats.find(c => c.id === currentChatId);
+      if (!current) return;
 
-    // RENDU D'UN MESSAGE
-    function appendMessageUI(sender, text, isThinking = false) {
-      const msgDiv = document.createElement('div');
-      msgDiv.className = sender === 'user' ? 'flex justify-end my-2' : 'flex justify-start my-2';
-
-      const container = document.createElement('div');
-      container.className = 'flex flex-col gap-1 max-w-[88%]';
-
-      const inner = document.createElement('div');
-      inner.className = sender === 'user' 
-        ? 'bg-indigo-600 text-white rounded-2xl px-4 py-3 text-sm shadow-md' 
-        : 'bg-slate-900 border border-slate-800 text-slate-200 rounded-2xl px-4 py-3 text-sm shadow-md';
-
-      if (sender === 'bot') {
-        inner.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : text;
-        setupCodeCopyButtons(inner);
-      } else {
-        inner.textContent = text;
-      }
-
-      container.appendChild(inner);
-
-      if (sender === 'bot' && !isThinking) {
-        const audioBtn = document.createElement('button');
-        audioBtn.className = 'self-start text-xs text-slate-400 hover:text-indigo-400 flex items-center gap-1 px-1 py-0.5 mt-1 transition';
-        audioBtn.innerHTML = '🔊 Écouter';
-        audioBtn.onclick = () => speakText(text);
-        container.appendChild(audioBtn);
-      }
-
-      msgDiv.appendChild(container);
-      chatBox.appendChild(msgDiv);
-      chatBox.scrollTop = chatBox.scrollHeight;
-      return inner;
-    }
-
-    function renderCurrentSession() {
-      chatBox.innerHTML = '';
-      const current = getCurrentSession();
-      if (!current || !current.messages || current.messages.length === 0) {
-        chatBox.innerHTML = `
-          <div class="p-4 bg-slate-900 border border-slate-800 rounded-2xl text-slate-300 text-sm">
-            👋 <b>Bienvenue sur Octopus AI !</b><br>Pose ta question ou joint une capture d'écran ci-dessous.
-          </div>
-        `;
-        return;
-      }
-      current.messages.forEach(m => appendMessageUI(m.role === 'user' ? 'user' : 'bot', m.content));
-    }
-
-    // RACCOURCIS BOUTONS
-    document.querySelectorAll('.shortcut-btn').forEach(btn => {
-      btn.onclick = () => {
-        userInput.value = btn.getAttribute('data-prompt') + " ";
-        userInput.focus();
-      };
-    });
-
-    // ENVOI MESSAGE
-    chatForm.onsubmit = async (e) => {
-      e.preventDefault();
-      const text = userInput.value.trim();
-      if (!text && !attachedFileContent) return;
-
-      const fullPrompt = text + attachedFileContent;
-
-      if (!currentSessionId || sessions.length === 0) createNewSession();
-      let current = getCurrentSession();
+      currentChatTitle.textContent = current.title;
 
       if (current.messages.length === 0) {
-        current.title = (text || 'Capture/Fichier').slice(0, 20);
+        messagesContainer.innerHTML = `
+          <div class="h-full flex flex-col items-center justify-center text-center text-slate-500 my-auto">
+            <div class="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-3xl mb-4 shadow-inner">🐙</div>
+            <h2 class="text-lg font-medium text-slate-300 mb-1">Comment puis-je t'aider aujourd'hui ?</h2>
+            <p class="text-xs max-w-sm text-slate-500">Pose-moi une question, demande du code, ou active la recherche Web 🌐 pour des infos en direct.</p>
+          </div>
+        `;
+        return;
       }
 
-      appendMessageUI('user', text || '📎 [Fichier/Screenshot joint]');
-      current.messages.push({ role: 'user', content: fullPrompt });
-      saveToStorage();
-      renderHistoryList();
+      messagesContainer.innerHTML = '';
+      current.messages.forEach(m => {
+        const isUser = m.role === 'user';
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `flex gap-3 max-w-3xl ${isUser ? 'ml-auto flex-row-reverse' : 'mr-auto'}`;
+        
+        msgDiv.innerHTML = `
+          <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold ${isUser ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-indigo-400 border border-slate-700'}">
+            ${isUser ? 'Vous' : '🐙'}
+          </div>
+          <div class="p-3.5 rounded-2xl text-sm leading-relaxed ${isUser ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-slate-900 text-slate-200 border border-slate-800 rounded-tl-none'} shadow-sm whitespace-pre-wrap">${escapeHtml(m.content)}</div>
+        `;
+        messagesContainer.appendChild(msgDiv);
+      });
 
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    function escapeHtml(text) {
+      return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    // --- SOUMISSION DE MESSAGE ---
+    chatForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const content = userInput.value.trim();
+      if (!content) return;
+
+      if (!currentChatId) createNewChat();
+      const current = chats.find(c => c.id === currentChatId);
+
+      // Met à jour le titre au 1er message
+      if (current.messages.length === 0) {
+        current.title = content.slice(0, 25) + (content.length > 25 ? '...' : '');
+      }
+
+      // Ajout message utilisateur
+      current.messages.push({ role: 'user', content });
       userInput.value = '';
-      removeFileBtn.click();
+      saveChats();
+      renderSidebar();
+      renderMessages();
 
-      const botElem = appendMessageUI('bot', '🐙 *Réflexion...*', true);
+      // Indicateur de chargement
+      const loadingDiv = document.createElement('div');
+      loadingDiv.className = 'flex gap-3 max-w-3xl mr-auto';
+      loadingDiv.innerHTML = `
+        <div class="w-8 h-8 rounded-xl bg-slate-800 text-indigo-400 border border-slate-700 flex items-center justify-center shrink-0 text-xs font-bold">🐙</div>
+        <div class="p-3.5 rounded-2xl bg-slate-900 text-slate-400 text-xs border border-slate-800 flex items-center gap-2">
+          <i class="fa-solid fa-spinner fa-spin"></i> ${isWebSearchActive ? 'Recherche sur le web...' : 'Réflexion en cours...'}
+        </div>
+      `;
+      messagesContainer.appendChild(loadingDiv);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
       try {
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            messages: current.messages, // Transmet TOUT L'HISTORIQUE pour la mémoire
-            mode: modeSelect.value
+            messages: current.messages,
+            mode: modeSelect.value,
+            webSearch: isWebSearchActive
           })
         });
 
         const data = await res.json();
+        loadingDiv.remove();
 
         if (res.ok && data.reply) {
-          botElem.innerHTML = typeof marked !== 'undefined' ? marked.parse(data.reply) : data.reply;
-          if (typeof Prism !== 'undefined') Prism.highlightAll();
-          setupCodeCopyButtons(botElem);
-          
-          current.messages.push({ role: 'assistant', content: data.reply });
-          saveToStorage();
-
-          const container = botElem.parentElement;
-          const audioBtn = document.createElement('button');
-          audioBtn.className = 'self-start text-xs text-slate-400 hover:text-indigo-400 flex items-center gap-1 px-1 py-0.5 mt-1 transition';
-          audioBtn.innerHTML = '🔊 Écouter';
-          audioBtn.onclick = () => speakText(data.reply);
-          container.appendChild(audioBtn);
-
+          current.messages.push({ role: 'bot', content: data.reply });
         } else {
-          botElem.innerHTML = `⚠️ **Erreur :** ${data.error || 'Erreur serveur'}`;
-          current.messages.pop();
-          saveToStorage();
+          current.messages.push({ role: 'bot', content: `⚠️ Erreur : ${data.error || 'Impossible d\'obtenir une réponse'}` });
         }
       } catch (err) {
-        botElem.innerHTML = `⚠️ **Erreur réseau**`;
+        loadingDiv.remove();
+        current.messages.push({ role: 'bot', content: '⚠️ Erreur de connexion au serveur.' });
       }
 
-      chatBox.scrollTop = chatBox.scrollHeight;
+      saveChats();
+      renderMessages();
     };
 
-    // INITIALISATION
-    if (sessions.length === 0) createNewSession();
+    newChatBtn.onclick = createNewChat;
+
+    // Initialisation
+    if (chats.length === 0) createNewChat();
     else {
-      if (!currentSessionId || !getCurrentSession()) currentSessionId = sessions[0].id;
-      renderHistoryList();
-      renderCurrentSession();
+      currentChatId = chats[0].id;
+      renderSidebar();
+      renderMessages();
     }
   </script>
 </body>
-          </html>
-      
+</html>
