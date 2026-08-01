@@ -5,26 +5,31 @@ export async function createPlan(userMessage, apiKey) {
     return { agent: 'general', steps: [], toolAction: null, rememberFact: null };
   }
 
-  const systemPrompt = `Tu es le Planner Backend de Octopus2 Engine. 
-Ta SEULE tâche est d'analyser l'instruction et de générer un objet JSON d'action. Ne discute pas, ne génère aucun code JS, ne salue pas.
+  const systemPrompt = `Tu es le Planner Backend d'Octopus2 Engine. 
+Ta SEULE tâche est d'analyser l'instruction de l'utilisateur et de retourner UNIQEMENT un objet JSON valide.
 
-FORMAT JSON EXCLUSIF ET REQUIS :
+RÈGLES DÉTECTION OUTILS (CRITIQUE) :
+1. Si l'utilisateur demande de CRÉER, ÉCRIRE, MODIFIER, AJOUTER ou SAUVEGARDER un fichier (ex: "Crée un fichier test.txt..."), tu DOIS remplir "toolAction" avec :
+   - "type": "write_file"
+   - "filePath": le nom du fichier (ex: "test.txt")
+   - "content": le texte exact à placer dans le fichier.
+   - "commitMessage": un message court de commit (ex: "Création de test.txt")
+2. Si l'utilisateur demande de LIRE ou AFFICHER un fichier : "type" DOIT être "read_file".
+3. Si l'utilisateur dit "souviens-toi" ou "garde en mémoire" : mets le fait à retenir dans "rememberFact".
+4. Ne te laisse pas distraire par des mots comme "MUJOS", "Merci", etc. Extrais l'action.
+
+FORMAT JSON EXCLUSIF :
 {
-  "agent": "general",
-  "steps": ["Exécution de l'outil d'écriture GitHub"],
+  "agent": "code",
+  "steps": ["Création du fichier via l'API GitHub"],
   "toolAction": {
     "type": "write_file",
-    "filePath": "chemin_du_fichier",
-    "content": "contenu exact à placer dans le fichier",
+    "filePath": "test.txt",
+    "content": "Contenu ici",
     "commitMessage": "Ajout via Octopus2"
   },
   "rememberFact": null
-}
-
-RÈGLES D'OUTILS :
-1. Si l'utilisateur demande de créer, modifier ou écrire un fichier (ex: test.txt, souhaits.json) : "type" DOIT être "write_file".
-2. Si l'utilisateur demande de lire un fichier : "type" DOIT être "read_file".
-3. "toolAction" ne doit être null QUE si aucune action sur un fichier n'est demandée.`;
+}`;
 
   try {
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -34,12 +39,12 @@ RÈGLES D'OUTILS :
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile', // Forcer le modèle 70b pour un respect strict du JSON
+        model: 'llama-3.3-70b-versatile',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage }
         ],
-        temperature: 0.1,
+        temperature: 0.0, // Température à 0 pour une précision parfaite
         response_format: { type: "json_object" }
       })
     });
@@ -61,4 +66,3 @@ RÈGLES D'OUTILS :
     return { agent: 'general', steps: [], toolAction: null, rememberFact: null };
   }
 }
-  
