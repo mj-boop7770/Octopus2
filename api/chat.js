@@ -56,8 +56,10 @@ export default async function handler(req, res) {
   const planSteps = planData.steps || [];
 
   // NIVEAU 11 : SAUVEGARDE AUTO DE MEMOIRE
+  let memorySavedSuccess = false;
   if (planData.rememberFact) {
     await saveMemory(planData.rememberFact);
+    memorySavedSuccess = true;
   }
 
   // NIVEAU 12 : EXECUTION D'OUTILS (LECTURE DE FICHIER GITHUB)
@@ -65,7 +67,9 @@ export default async function handler(req, res) {
   if (planData.toolAction?.type === 'read_file' && planData.toolAction?.filePath) {
     const fetchedContent = await getGitHubFile(planData.toolAction.filePath);
     if (fetchedContent) {
-      fileContext = `\n\n[CONTENU DU FICHIER ${planData.toolAction.filePath} LUS DEPUIS GITHUB]:\n\`\`\`javascript\n${fetchedContent}\n\`\`\``;
+      fileContext = `\n\n[CONTENU RÉEL DU FICHIER ${planData.toolAction.filePath} EXTRAIT DE GITHUB]:\n\`\`\`json\n${fetchedContent}\n\`\`\``;
+    } else {
+      fileContext = `\n\n[ERREUR GITHUB]: Le fichier ${planData.toolAction.filePath} n'a pas pu être lu ou est introuvable.`;
     }
   }
 
@@ -88,16 +92,23 @@ export default async function handler(req, res) {
     }
   }
 
-  // CONSTRUCTION DU SYSTEM PROMPT
+  // CONSTRUCTION DU SYSTEM PROMPT AVEC DIRECTIVES STRICTES
   let systemContent = getAgentPrompt(activeAgent);
   systemContent += `\n\n${getProjectMemory()}`;
   systemContent += longTermMem;
-  systemContent += fileContext; // Injection du fichier lu via Tool (Niveau 12)
+  systemContent += fileContext;
   systemContent += planContext;
 
-  if (webSearch && hasWebResults) {
-    systemContent += `\n\n[RÉSULTATS DU WEB EN TEMPS RÉEL]:\n${searchContext}\n\nCONSIGNE STRICTE: Réponds uniquement en t'appuyant sur les données Web ci-dessus.`;
+  if (memorySavedSuccess) {
+    systemContent += `\n\n[NOTE SYSTEME]: La fait suivant a été automatiquement enregistré en mémoire globale : "${planData.rememberFact}". Confirme-le brièvement à l'utilisateur sans générer de code.`;
   }
+
+  if (webSearch && hasWebResults) {
+    systemContent += `\n\n[RÉSULTATS DU WEB EN TEMPS RÉEL]:\n${searchContext}`;
+  }
+
+  // CONSIGNE D'INTERDICTION D'HALUCINATION
+  systemContent += `\n\n[CONSIGNE STRICTE]: Si le contenu d'un fichier GitHub ou des résultats Web sont fournis ci-dessus, utilise-les DIRECTEMENT. N'invente JAMAIS de contenu de fichier (ne dis pas "Je vais supposer que..."). N'écris JAMAIS de code Node.js pour simuler la sauvegarde en mémoire, affirme simplement que l'action est faite.`;
 
   const formattedMessages = messages.map(m => ({
     role: (m.role === 'bot' || m.role === 'assistant') ? 'assistant' : 'user',
@@ -151,5 +162,5 @@ export default async function handler(req, res) {
   }
 
   return res.status(500).json({ error: `Groq: ${lastErrorDetail || "Erreur de connexion"}` });
-}
-  
+        }
+    
