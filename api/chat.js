@@ -3,7 +3,7 @@ import { getProjectMemory } from './lib/memory.js';
 import { getAgentPrompt } from './lib/specializedAgents.js';
 import { verifyAndRefine } from './lib/reviewer.js';
 import { getLongTermMemory, saveMemory } from './lib/longTermMemory.js';
-import { getGitHubFile } from './lib/githubTools.js';
+import { getGitHubFile, writeGitHubFile } from './lib/githubTools.js';
 
 // Recherche Web via Tavily
 async function searchTavily(query, apiKey) {
@@ -50,7 +50,7 @@ export default async function handler(req, res) {
 
   const lastUserMessage = messages[messages.length - 1]?.content || "";
 
-  // RECONNAISSANCE DE MUJOS (MODE CRÉATEUR / PROMPT DIALOGUE)
+  // RECONNAISSANCE DE MUJOS (MODE CRÉATEUR)
   const isMujosMode = lastUserMessage.toUpperCase().includes('MUJOS');
 
   // NIVEAU 1 : EXECUTION DU PLANNER
@@ -65,13 +65,22 @@ export default async function handler(req, res) {
     memorySavedSuccess = true;
   }
 
-  // NIVEAU 12 : LECTURE GITHUB
+  // NIVEAU 12 : EXECUTION D'OUTILS (LECTURE & ÉCRITURE GITHUB)
   let fileContext = "";
   if (planData.toolAction?.type === 'read_file' && planData.toolAction?.filePath) {
     const fetchedContent = await getGitHubFile(planData.toolAction.filePath);
     if (fetchedContent) {
       fileContext = `\n\n[CONTENU RÉEL DU FICHIER ${planData.toolAction.filePath} EXTRAIT DE GITHUB]:\n\`\`\`json\n${fetchedContent}\n\`\`\``;
+    } else {
+      fileContext = `\n\n[ERREUR GITHUB]: Impossible de lire le fichier ${planData.toolAction.filePath}.`;
     }
+  } else if (planData.toolAction?.type === 'write_file' && planData.toolAction?.filePath && planData.toolAction?.content) {
+    const success = await writeGitHubFile(
+      planData.toolAction.filePath,
+      planData.toolAction.content,
+      planData.toolAction.commitMessage || "Mise à jour via Octopus2 Engine"
+    );
+    fileContext = `\n\n[ACTION GITHUB EXECUTE] : L'écriture dans le fichier "${planData.toolAction.filePath}" a ${success ? 'RÉUSSI avec succès' : 'ÉCHOUÉ'}.`;
   }
 
   const planContext = planSteps.length > 0 
@@ -167,5 +176,5 @@ export default async function handler(req, res) {
   }
 
   return res.status(500).json({ error: `Groq: ${lastErrorDetail || "Erreur de connexion"}` });
-    }
-  
+      }
+    
