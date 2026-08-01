@@ -92,7 +92,7 @@ export default async function handler(req, res) {
     }
   }
 
-  // CONSTRUCTION DU SYSTEM PROMPT AVEC DIRECTIVES STRICTES
+  // CONSTRUCTION DU SYSTEM PROMPT
   let systemContent = getAgentPrompt(activeAgent);
   systemContent += `\n\n${getProjectMemory()}`;
   systemContent += longTermMem;
@@ -100,15 +100,18 @@ export default async function handler(req, res) {
   systemContent += planContext;
 
   if (memorySavedSuccess) {
-    systemContent += `\n\n[NOTE SYSTEME]: La fait suivant a été automatiquement enregistré en mémoire globale : "${planData.rememberFact}". Confirme-le brièvement à l'utilisateur sans générer de code.`;
+    systemContent += `\n\n[NOTE SYSTEME]: La mémoire a déjà été mise à jour en arrière-plan avec l'information suivante : "${planData.rememberFact}".`;
   }
 
   if (webSearch && hasWebResults) {
     systemContent += `\n\n[RÉSULTATS DU WEB EN TEMPS RÉEL]:\n${searchContext}`;
   }
 
-  // CONSIGNE D'INTERDICTION D'HALUCINATION
-  systemContent += `\n\n[CONSIGNE STRICTE]: Si le contenu d'un fichier GitHub ou des résultats Web sont fournis ci-dessus, utilise-les DIRECTEMENT. N'invente JAMAIS de contenu de fichier (ne dis pas "Je vais supposer que..."). N'écris JAMAIS de code Node.js pour simuler la sauvegarde en mémoire, affirme simplement que l'action est faite.`;
+  // DIRECTIVES STRICTES ANTI-HALLUCINATION ET ANTI-FAUX CODE
+  systemContent += `\n\n[INSTRUCTIONS CRITIQUES DE FORMALISATION] :
+1. NE N'ÉCRIS JAMAIS DE CODE JAVASCRIPT OU JSON POUR SIMULER DES ACTIONS (ne génère AUCUN bloc \`\`\`javascript pour simuler global.memory ou require).
+2. Pour la mémoire globale, affirme simplement par UNE PHRASE EN TEXTE CLAIR que la note a été enregistrée avec succès.
+3. Exploite directement le contenu réel du package.json fourni ci-dessus sans inventer d'autres dépendances.`;
 
   const formattedMessages = messages.map(m => ({
     role: (m.role === 'bot' || m.role === 'assistant') ? 'assistant' : 'user',
@@ -162,5 +165,5 @@ export default async function handler(req, res) {
   }
 
   return res.status(500).json({ error: `Groq: ${lastErrorDetail || "Erreur de connexion"}` });
-        }
-    
+}
+  
