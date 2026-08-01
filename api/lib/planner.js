@@ -5,25 +5,26 @@ export async function createPlan(userMessage, apiKey) {
     return { agent: 'general', steps: [], toolAction: null, rememberFact: null };
   }
 
-  const systemPrompt = `Tu es le Planner intelligent d'Octopus2 Engine.
-Analyse le message de l'utilisateur et retourne EXCLUSIVEMENT un objet JSON valide suivant ce format strict :
+  const systemPrompt = `Tu es le Planner Backend de Octopus2 Engine. 
+Ta SEULE tâche est d'analyser l'instruction et de générer un objet JSON d'action. Ne discute pas, ne génère aucun code JS, ne salue pas.
 
+FORMAT JSON EXCLUSIF ET REQUIS :
 {
-  "agent": "general | code | debug | review | test",
-  "steps": ["Étape 1...", "Étape 2..."],
-  "toolAction": null OU {
-    "type": "read_file | write_file",
-    "filePath": "chemin/du/fichier.ext",
-    "content": "contenu exact à écrire (uniquement si type est write_file)",
-    "commitMessage": "message de commit rapide (uniquement si type est write_file)"
+  "agent": "general",
+  "steps": ["Exécution de l'outil d'écriture GitHub"],
+  "toolAction": {
+    "type": "write_file",
+    "filePath": "chemin_du_fichier",
+    "content": "contenu exact à placer dans le fichier",
+    "commitMessage": "Ajout via Octopus2"
   },
-  "rememberFact": null OU "Information clé importante à retenir à long terme"
+  "rememberFact": null
 }
 
-Règles pour toolAction :
-- Si l'utilisateur demande de lire, consulter ou analyser un fichier du projet, utilise "type": "read_file".
-- Si l'utilisateur demande de créer, modifier, mettre à jour ou sauvegarder du code dans un fichier, utilise "type": "write_file".
-- Ne génère aucun texte avant ou après le JSON.`;
+RÈGLES D'OUTILS :
+1. Si l'utilisateur demande de créer, modifier ou écrire un fichier (ex: test.txt, souhaits.json) : "type" DOIT être "write_file".
+2. Si l'utilisateur demande de lire un fichier : "type" DOIT être "read_file".
+3. "toolAction" ne doit être null QUE si aucune action sur un fichier n'est demandée.`;
 
   try {
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -33,7 +34,7 @@ Règles pour toolAction :
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
+        model: 'llama-3.3-70b-versatile', // Forcer le modèle 70b pour un respect strict du JSON
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage }
@@ -43,10 +44,11 @@ Règles pour toolAction :
       })
     });
 
-    if (!res.ok) throw new Error("Erreur réponse Planner");
+    if (!res.ok) throw new Error("Erreur Planner API");
 
     const data = await res.json();
-    const parsed = JSON.parse(data.choices[0].message.content);
+    const rawContent = data.choices[0]?.message?.content || "{}";
+    const parsed = JSON.parse(rawContent);
 
     return {
       agent: parsed.agent || 'general',
@@ -55,6 +57,7 @@ Règles pour toolAction :
       rememberFact: parsed.rememberFact || null
     };
   } catch (e) {
+    console.error("Erreur parsing Planner:", e);
     return { agent: 'general', steps: [], toolAction: null, rememberFact: null };
   }
 }
