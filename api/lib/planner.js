@@ -1,28 +1,29 @@
-// api/lib/planner.js
+// lib/planner.js
 
-/**
- * Niveau 1 — Planner & Générateur de Contexte de Session (Niveau 11 & 12)
- */
-export async function createPlan(userQuery, apiKey) {
-  if (!userQuery || !apiKey) {
-    return { agent: 'general', steps: [], sessionNote: null, toolAction: null };
+export async function createPlan(userMessage, apiKey) {
+  if (!userMessage || !apiKey) {
+    return { agent: 'general', steps: [], toolAction: null, rememberFact: null };
   }
 
-  const systemPrompt = `Tu es le Planner d'Octopus2.
-Analyse la demande et renvoie un JSON STRICT au format suivant :
+  const systemPrompt = `Tu es le Planner intelligent d'Octopus2 Engine.
+Analyse le message de l'utilisateur et retourne EXCLUSIVEMENT un objet JSON valide suivant ce format strict :
+
 {
-  "agent": "code" | "debug" | "review" | "test" | "documentation" | "writing" | "general",
+  "agent": "general | code | debug | review | test",
   "steps": ["Étape 1...", "Étape 2..."],
-  "sessionNote": "Une phrase résumé de ce que l'utilisateur fait ou demande dans ce message" ou null,
-  "toolAction": {
-    "type": "read_file" | "write_file" | null,
-    "filePath": "chemin/du/fichier.js" ou null
-  }
+  "toolAction": null OU {
+    "type": "read_file | write_file",
+    "filePath": "chemin/du/fichier.ext",
+    "content": "contenu exact à écrire (uniquement si type est write_file)",
+    "commitMessage": "message de commit rapide (uniquement si type est write_file)"
+  },
+  "rememberFact": null OU "Information clé importante à retenir à long terme"
 }
 
-RÈGLES :
-- Extrais toujours une synthèse concise dans "sessionNote" (ex: "Développement du module de login", "Débogage API Groq").
-- Si l'utilisateur demande de lire un fichier, indique "read_file" et son chemin dans "toolAction".`;
+Règles pour toolAction :
+- Si l'utilisateur demande de lire, consulter ou analyser un fichier du projet, utilise "type": "read_file".
+- Si l'utilisateur demande de créer, modifier, mettre à jour ou sauvegarder du code dans un fichier, utilise "type": "write_file".
+- Ne génère aucun texte avant ou après le JSON.`;
 
   try {
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -35,26 +36,26 @@ RÈGLES :
         model: 'llama-3.1-8b-instant',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: userQuery }
+          { role: 'user', content: userMessage }
         ],
         temperature: 0.1,
         response_format: { type: "json_object" }
       })
     });
 
-    if (!res.ok) return { agent: 'general', steps: [], sessionNote: null, toolAction: null };
+    if (!res.ok) throw new Error("Erreur réponse Planner");
 
     const data = await res.json();
-    const parsed = JSON.parse(data.choices?.[0]?.message?.content || '{}');
+    const parsed = JSON.parse(data.choices[0].message.content);
 
     return {
       agent: parsed.agent || 'general',
-      steps: parsed.steps || [],
-      sessionNote: parsed.sessionNote || null,
-      toolAction: parsed.toolAction || null
+      steps: Array.isArray(parsed.steps) ? parsed.steps : [],
+      toolAction: parsed.toolAction || null,
+      rememberFact: parsed.rememberFact || null
     };
   } catch (e) {
-    console.error("Erreur Planner:", e);
-    return { agent: 'general', steps: [], sessionNote: null, toolAction: null };
+    return { agent: 'general', steps: [], toolAction: null, rememberFact: null };
   }
-  }
+}
+  
