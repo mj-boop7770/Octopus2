@@ -102,7 +102,7 @@ export default async function handler(req, res) {
   }
 
   const planContext = planSteps.length > 0 
-    ? `\n\n[PLAN D'ACTION DU PLANNER]:\n${planSteps.map((step, index) => `${index + 1}. ${step}`).join("\n")}`
+    ? `\n\n[PLAN D'ACTION DU PLANNER]:\n${planSteps.map((step, index) => `${index + 1}.${step}`).join("\n")}`
     : "";
 
   const longTermMem = await getLongTermMemory();
@@ -174,9 +174,12 @@ export default async function handler(req, res) {
       if (groqRes.ok && data.choices?.[0]?.message?.content) {
         let finalReply = data.choices[0].message.content;
 
-        // NIVEAU 10 : AUTO-CORRECTION (Désactivée si une action outil a été exécutée)
+        // NIVEAU 10 : AUTO-CORRECTION INTELLIGENTE
+        // S'active SEULEMENT si l'agent est technique, qu'AUCUN outil n'a été exécuté, ET que la réponse contient réellement du code/JSON.
         const technicalAgents = ['code', 'debug', 'review', 'test'];
-        if (technicalAgents.includes(activeAgent) && !toolAction) {
+        const containsCodeOrJson = /```|[\{\}\[\]]|<[a-z0-9]+>/i.test(finalReply);
+
+        if (technicalAgents.includes(activeAgent) && !toolAction && containsCodeOrJson) {
           finalReply = await verifyAndRefine(finalReply, lastUserMessage, apiKey);
         }
 
@@ -195,5 +198,4 @@ export default async function handler(req, res) {
   }
 
   return res.status(500).json({ error: `Groq: ${lastErrorDetail || "Erreur de connexion"}` });
-        }
-  
+          }
