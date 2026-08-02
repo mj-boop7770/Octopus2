@@ -1,4 +1,6 @@
-// api/specializedAgents.js
+// api/lib/specializedAgents.js
+const { MODEL_REGISTRY } = require('./modelRegistry.js');
+
 async function executeLLMCall({ provider, modelName, systemPrompt, messages, keys }) {
   if (provider === 'groq') {
     if (!keys.groq) throw new Error("Clé GROQ_API_KEY manquante");
@@ -68,8 +70,8 @@ PROJET ACTIF : ${activeProject !== 'none' ? activeProject : 'Aucun projet spéci
 
 RÈGLES STRICTES :
 1. Isole strictement le projet actif (${activeProject}). Ne le mélange jamais avec un autre.
-2. Ne génère JAMAIS spontanément de fichiers de configuration (ex: tsconfig.json) sauf si demandé explicitement.
-3. Sois concis et direct.`;
+2. Ne génère JAMAIS spontanément de fichiers de configuration (ex: tsconfig.json, package.json) sauf si demandé explicitement.
+3. Sois concis, direct et efficace.`;
 
   if (agent === 'code') {
     systemPrompt += `\n\n[MODE CODE DÉDIÉ] : Tu es un développeur senior. Fournis du code propre pour le projet ${activeProject}.`;
@@ -88,7 +90,7 @@ RÈGLES STRICTES :
     content: m.content
   })).slice(-8);
 
-  // Tentative principale sur le modèle choisi par le Planner
+  // Tentative principale
   try {
     const response = await executeLLMCall({
       provider: selectedModel.provider,
@@ -102,8 +104,13 @@ RÈGLES STRICTES :
     console.warn(`Échec de ${selectedModel.id}, bascule sur le secours Groq 70B...`, e.message);
   }
 
-  // Secours (Fallback) sur Groq Brain 70B
-  const fallbackModel = { id: "groq-brain-70b", provider: "groq", modelName: "llama-3.3-70b-versatile" };
+  // Secours (Fallback)
+  const fallbackModel = MODEL_REGISTRY.find(m => m.id === 'groq-brain-70b') || {
+    id: "groq-brain-70b",
+    provider: "groq",
+    modelName: "llama-3.3-70b-versatile"
+  };
+
   const fallbackResponse = await executeLLMCall({
     provider: fallbackModel.provider,
     modelName: fallbackModel.modelName,
@@ -116,4 +123,4 @@ RÈGLES STRICTES :
 }
 
 module.exports = { runSpecializedAgent };
-           
+    
