@@ -1,46 +1,47 @@
-// api/lib/reviewer.js
+// lib/reviewer.js
 
-/**
- * Niveau 10 — La Boucle Intelligente (Auto-Correction & Relecture)
- * Analyse la réponse produite par l'agent et s'assure qu'elle ne contient pas d'erreurs flagrantes.
- */
-export async function verifyAndRefine(draftResponse, userQuery, apiKey) {
-  if (!draftResponse || !apiKey) return draftResponse;
+export async function verifyAndRefine(reply, userMessage, apiKey) {
+  if (!reply || !apiKey) return reply;
 
-  const systemPrompt = `Tu es le Reviewer interne d'Octopus2. Ton rôle est de vérifier la réponse générée par l'IA avant qu'elle ne soit envoyée à l'utilisateur.
+  // Prompt d'inspection invisible
+  const systemPrompt = `Tu es le Reviewer Backend d'Octopus2 Engine.
+Ta seule mission est de vérifier la qualité technique de la réponse générée.
 
-RÈGLES STRICTES :
-1. Vérifie si le code/texte fourni répond bien à la demande : "${userQuery}".
-2. S'il y a des erreurs de syntaxe évidente, des bugs ou des explications incomplètes, CORRIGE-LES.
-3. Si la réponse initiale est déjà excellente et sans erreur, renvoie-la TELLE QUELLE sans modification.
-4. Ne rajoute pas d'explications sur ton rôle de reviewer (pas de "J'ai relu le code et..."). Donne directement la réponse finale propre.`;
+RÈGLES ABSOLUES ET STRICTES :
+1. Sois 100% INVISIBLE et MUET.
+2. Ne dis JAMAIS "La réponse est correcte", "Voici la réponse corrigée", "Bonjour" ou quoi que ce soit d'autre.
+3. Si le texte contient du code (HTML, CSS, JS, JSON), corrige uniquement les erreurs de syntaxe ou d'incohérence SILENCIEUSEMENT.
+4. Si la réponse est déjà bonne, RENVOIE LA EXACTEMENT À L'IDENTIQUE, mot pour mot, sans rien ajouter.
+5. Ne modifie JAMAIS le ton ou les salutations de la réponse.
+6. Ta sortie doit contenir uniquement le texte/code final destiné à l'utilisateur. Aucun méta-commentaire.`;
 
   try {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant', // Modèle ultra-rapide pour ne pas impacter le temps de réponse
+        model: 'llama-3.3-70b-versatile',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: draftResponse }
+          { role: 'user', content: `[MESSAGE UTILISATEUR ORIGINAL]: ${userMessage}\n\n[RÉPONSE À INSPECTER ET CORRIGER SILENCIEUSEMENT]:\n${reply}` }
         ],
-        temperature: 0.1,
+        temperature: 0.0, // Précision maximale
         max_tokens: 1500
       })
     });
 
-    if (!response.ok) return draftResponse;
+    if (!res.ok) return reply; // Fallback sur la réponse originale si l'API échoue
 
-    const data = await response.json();
-    const refinedContent = data.choices?.[0]?.message?.content;
+    const data = await res.json();
+    const refined = data.choices?.[0]?.message?.content?.trim();
 
-    return refinedContent || draftResponse;
-  } catch (error) {
-    console.error("Erreur lors de l'auto-correction:", error);
-    return draftResponse; // En cas d'échec, on renvoie le premier jet
+    // Si le reviewer renvoie quelque chose de valide, on l'utilise, sinon fallback
+    return refined || reply;
+  } catch (e) {
+    console.error("Erreur Reviewer:", e);
+    return reply; // Sécurité : en cas de bug du reviewer, on garde la réponse originale
   }
-          }
+}
