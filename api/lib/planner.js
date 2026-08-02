@@ -1,38 +1,50 @@
-// api/planner.js - Correctif de Production
-import { MODEL_REGISTRY } from './lib/modelRegistry.js';
+// api/planner.js - Version CommonJS pour Vercel
 
-const FALLBACK_MODEL = MODEL_REGISTRY[0] || {
-  id: "groq-planner",
-  provider: "groq",
-  modelName: "llama-3.1-8b-instant"
-};
+const MODEL_REGISTRY = [
+  {
+    id: "groq-planner",
+    provider: "groq",
+    modelName: "llama-3.1-8b-instant"
+  },
+  {
+    id: "groq-architecture",
+    provider: "groq",
+    modelName: "llama-3.3-70b-versatile"
+  },
+  {
+    id: "openrouter-agent-code",
+    provider: "openrouter",
+    modelName: "poolside/laguna-m.1:free"
+  },
+  {
+    id: "gemini-multimodal",
+    provider: "gemini",
+    modelName: "gemini-2.5-flash"
+  }
+];
 
-export async function planRequest(userMessage, historySummary = "", hasImage = false, groqApiKey) {
+async function planRequest(userMessage, historySummary = "", hasImage = false, groqApiKey) {
+  const defaultModel = MODEL_REGISTRY[0];
+
   if (!groqApiKey) {
-    return {
-      selectedModel: FALLBACK_MODEL,
-      agent: 'general',
-      activeProject: 'none',
-      needsWebSearch: false,
-      reasoning: 'Fallback sans clé API'
-    };
+    return { selectedModel: defaultModel, agent: 'general', activeProject: 'none', needsWebSearch: false, reasoning: 'Pas de clé' };
   }
 
   const systemPrompt = `Tu es le Planner d'Octopus2. Réponds UNIQUEMENT sous forme d'un objet JSON valide.
 
 RÈGLES D'AGENT :
-- "general" : Salutations, discussion, simple déclaration d'information (ex: "Mon projet s'appelle X").
-- "code" : UNIQUEMENT si l'utilisateur demande EXPLICITEMENT de coder/générer un fichier.
-- "debug" : Détection de bugs ou erreurs explicites.
-- "github" : Action explicite sur GitHub.
+- "general" : Salutations, discussion, déclarations (ex: "Mon projet s'appelle X").
+- "code" : UNIQUEMENT si l'utilisateur demande EXPLICITEMENT de coder.
+- "debug" : Bugs ou erreurs.
+- "github" : Action GitHub.
 
-FORMAT DE SORTIE JSON OBLIGATOIRE :
+FORMAT DE SORTIE JSON STRICT :
 {
   "selectedModelId": "groq-planner",
   "agent": "general" | "code" | "debug" | "github",
   "activeProject": "NomDuProjet ou none",
   "needsWebSearch": false,
-  "reasoning": "Explication courte"
+  "reasoning": "Raison"
 }`;
 
   try {
@@ -54,15 +66,14 @@ FORMAT DE SORTIE JSON OBLIGATOIRE :
     });
 
     if (!response.ok) {
-      console.warn(`Planner Groq Error Status: ${response.status}`);
-      return { selectedModel: FALLBACK_MODEL, agent: 'general', activeProject: 'none', reasoning: 'Fallback HTTP' };
+      return { selectedModel: defaultModel, agent: 'general', activeProject: 'none', reasoning: 'Erreur HTTP Groq' };
     }
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
     const result = content ? JSON.parse(content) : {};
 
-    const selectedModel = MODEL_REGISTRY.find(m => m.id === result.selectedModelId) || FALLBACK_MODEL;
+    const selectedModel = MODEL_REGISTRY.find(m => m.id === result.selectedModelId) || defaultModel;
 
     return {
       selectedModel,
@@ -73,13 +84,9 @@ FORMAT DE SORTIE JSON OBLIGATOIRE :
     };
 
   } catch (error) {
-    console.error("Erreur interceptée dans planner.js :", error.message);
-    return {
-      selectedModel: FALLBACK_MODEL,
-      agent: 'general',
-      activeProject: 'none',
-      reasoning: 'Fallback Securite'
-    };
+    return { selectedModel: defaultModel, agent: 'general', activeProject: 'none', reasoning: 'Catch error' };
   }
-                                   }
-      
+}
+
+module.exports = { planRequest };
+    
