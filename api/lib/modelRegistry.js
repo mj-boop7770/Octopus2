@@ -68,3 +68,4 @@ const MODEL_REGISTRY = [
 ];
 
 module.exports = { MODEL_REGISTRY };
+      
