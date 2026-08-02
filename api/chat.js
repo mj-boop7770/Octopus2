@@ -1,6 +1,6 @@
-// api/chat.js - Entrypoint principal Octopus2
-const { planRequest } = require('./planner.js');
-const { runSpecializedAgent } = require('./specializedAgents.js');
+// api/chat.js - Entrypoint Vercel adapté à ton dossier api/lib/
+const { planRequest } = require('./lib/planner.js');
+const { runSpecializedAgent } = require('./lib/specializedAgents.js');
 
 let getChatHistory, saveChatMessage, writeGitHubFile;
 try {
@@ -62,7 +62,7 @@ module.exports = async function handler(req, res) {
       } catch (e) {}
     }
 
-    // 1. Détermination du plan via Planner
+    // 1. Détermination du plan via Planner (dans api/lib/)
     const plan = await planRequest(lastUserMsg, historySummary, Boolean(hasImage), keys.groq);
 
     // 2. Traitement des outils
@@ -82,7 +82,7 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // 3. Exécution via l'agent spécialisé
+    // 3. Exécution via l'agent spécialisé (dans api/lib/)
     const agentResult = await runSpecializedAgent({
       plan,
       messages,
@@ -113,4 +113,4 @@ module.exports = async function handler(req, res) {
     });
   }
 };
-                            
+        
