@@ -1,5 +1,5 @@
-// api/planner.js
-const { MODEL_REGISTRY } = require('./lib/modelRegistry.js');
+// api/lib/planner.js
+const { MODEL_REGISTRY } = require('./modelRegistry.js');
 
 const FALLBACK_MODEL = MODEL_REGISTRY.find(m => m.id === 'groq-planner-fast') || MODEL_REGISTRY[0];
 
@@ -14,7 +14,6 @@ async function planRequest(userMessage, historySummary = "", hasImage = false, g
     };
   }
 
-  // Description dynamique injectée depuis le registre exact
   const registryDescription = MODEL_REGISTRY.map(m => 
     `- ID: "${m.id}" | Modèle: ${m.modelName} | Forces: ${m.strengths.join(', ')} | Cas d'usages: ${m.bestFor.join(', ')}`
   ).join('\n');
@@ -88,4 +87,4 @@ FORMAT DE SORTIE JSON STRICT :
 }
 
 module.exports = { planRequest };
-        
+          
