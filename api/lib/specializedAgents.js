@@ -1,8 +1,5 @@
-// api/specializedAgents.js - Exécution des Agents et des Modèles Sélectionnés
-
-// Fonction utilitaire pour exécuter les requêtes selon le fournisseur
+// api/specializedAgents.js
 async function executeLLMCall({ provider, modelName, systemPrompt, messages, keys }) {
-  // 1. Appel GROQ
   if (provider === 'groq') {
     if (!keys.groq) throw new Error("Clé GROQ_API_KEY manquante");
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -23,7 +20,6 @@ async function executeLLMCall({ provider, modelName, systemPrompt, messages, key
     return data.choices?.[0]?.message?.content;
   }
 
-  // 2. Appel OPENROUTER
   if (provider === 'openrouter') {
     if (!keys.openrouter) throw new Error("Clé OPENROUTER_API_KEY manquante");
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -46,7 +42,6 @@ async function executeLLMCall({ provider, modelName, systemPrompt, messages, key
     return data.choices?.[0]?.message?.content;
   }
 
-  // 3. Appel GEMINI
   if (provider === 'gemini') {
     if (!keys.gemini) throw new Error("Clé GEMINI_API_KEY manquante");
     const lastMessage = messages[messages.length - 1]?.content || "";
@@ -62,42 +57,38 @@ async function executeLLMCall({ provider, modelName, systemPrompt, messages, key
     return data.candidates?.[0]?.content?.parts?.[0]?.text;
   }
 
-  throw new Error(`Fournisseur d'IA inconnu: ${provider}`);
+  throw new Error(`Fournisseur inconnu: ${provider}`);
 }
 
-// Fonction principale exportée
-export async function runSpecializedAgent({ plan, messages, contextData = "", keys }) {
+async function runSpecializedAgent({ plan, messages, contextData = "", keys }) {
   const { selectedModel, agent, activeProject } = plan;
 
-  // Construction du Prompt Système en fonction de l'Agent et du Projet actif
-  let systemPrompt = `Tu es Octopus2, une IA de production intelligente, précise et directe.
+  let systemPrompt = `Tu es Octopus2, une IA de production directe et précise.
 PROJET ACTIF : ${activeProject !== 'none' ? activeProject : 'Aucun projet spécifique'}.
 
-RÈGLES D'EXÉCUTION STRICTES :
-1. Isole strictement les projets : Ne mélange jamais les fichiers, le contexte ou la logique d'un autre projet avec le projet actif (${activeProject}).
-2. Ne génère JAMAIS spontanément de fichiers de configuration (comme tsconfig.json, package.json) ni de gros blocs de code si l'utilisateur ne l'a pas demandé explicitement.
-3. Sois concis, clair et directement utile dans tes réponses.`;
+RÈGLES STRICTES :
+1. Isole strictement le projet actif (${activeProject}). Ne le mélange jamais avec un autre.
+2. Ne génère JAMAIS spontanément de fichiers de configuration (ex: tsconfig.json) sauf si demandé explicitement.
+3. Sois concis et direct.`;
 
-  // Spécialisation selon le rôle déterminé par le Planner
   if (agent === 'code') {
-    systemPrompt += `\n\n[MODE DÉVELOPPEUR SENIOR] : L'utilisateur demande du code. Fournis du code propre, moderne, commenté et directement utilisable pour le projet ${activeProject}.`;
+    systemPrompt += `\n\n[MODE CODE DÉDIÉ] : Tu es un développeur senior. Fournis du code propre pour le projet ${activeProject}.`;
   } else if (agent === 'debug') {
-    systemPrompt += `\n\n[MODE DIAGNOSTIC & DEBUG] : L'utilisateur signale une erreur. Identifie la cause racine et propose la correction exacte sans bavardage inutile.`;
+    systemPrompt += `\n\n[MODE DIAGNOSTIC] : Identifie la cause racine du bug et corrige-la.`;
   } else if (agent === 'github') {
-    systemPrompt += `\n\n[MODE INTÉGRATION GITHUB] : Réponds en tenant compte des interactions directes avec le dépôt GitHub.`;
+    systemPrompt += `\n\n[MODE GITHUB] : Réponds en tenant compte de l'action sur le dépôt.`;
   }
 
   if (contextData) {
-    systemPrompt += `\n\n[CONTEXTE COMPLÉMENTAIRE (Web/Outillage)] :\n${contextData}`;
+    systemPrompt += `\n\n[CONTEXTE COMPLÉMENTAIRE] :\n${contextData}`;
   }
 
-  // Formatage propre des messages pour les API
   const formattedMessages = messages.map(m => ({
     role: (m.role === 'bot' || m.role === 'assistant') ? 'assistant' : 'user',
     content: m.content
-  })).slice(-8); // Conservation des 8 derniers échanges
+  })).slice(-8);
 
-  // Tentative d'exécution principale
+  // Tentative principale sur le modèle choisi par le Planner
   try {
     const response = await executeLLMCall({
       provider: selectedModel.provider,
@@ -106,29 +97,23 @@ RÈGLES D'EXÉCUTION STRICTES :
       messages: formattedMessages,
       keys
     });
-
     if (response) return { response, usedModel: selectedModel };
-  } catch (primaryError) {
-    console.warn(`Échec avec le moteur principal (${selectedModel.id}):`, primaryError.message);
+  } catch (e) {
+    console.warn(`Échec de ${selectedModel.id}, bascule sur le secours Groq 70B...`, e.message);
   }
 
-  // Secours (Fallback) sur Groq Llama-3.3-70b si le modèle sélectionné échoue
-  try {
-    console.log("Bascule sur le modèle de secours (groq-architecture)...");
-    const fallbackResponse = await executeLLMCall({
-      provider: 'groq',
-      modelName: 'llama-3.3-70b-versatile',
-      systemPrompt,
-      messages: formattedMessages,
-      keys
-    });
-    return { 
-      response: fallbackResponse, 
-      usedModel: { id: "groq-architecture-fallback", provider: "groq", modelName: "llama-3.3-70b-versatile" } 
-    };
-  } catch (fallbackError) {
-    console.error("Échec du secours Groq:", fallbackError.message);
-    throw new Error("Tous les services d'IA configurés ont échoué.");
-  }
-                            }
-        
+  // Secours (Fallback) sur Groq Brain 70B
+  const fallbackModel = { id: "groq-brain-70b", provider: "groq", modelName: "llama-3.3-70b-versatile" };
+  const fallbackResponse = await executeLLMCall({
+    provider: fallbackModel.provider,
+    modelName: fallbackModel.modelName,
+    systemPrompt,
+    messages: formattedMessages,
+    keys
+  });
+
+  return { response: fallbackResponse, usedModel: fallbackModel };
+}
+
+module.exports = { runSpecializedAgent };
+           
