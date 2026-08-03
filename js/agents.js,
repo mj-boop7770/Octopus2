@@ -1,0 +1,8 @@
+// js/agents.js (À ajouter dans ton objet ou tableau d'agents)
+export const musicAgent = {
+  id: "music-generator",
+  name: "Maestro Audio",
+  description: "Compositeur IA de pistes musicales et d'ambiances sonores.",
+  systemPrompt: "Tu es un compositeur de musique. Quand l'utilisateur te demande un style, transforme sa demande en un prompt musical précis en anglais pour l'API.",
+  type: "audio" // Permet d'identifier que cet agent renvoie du contenu audio
+};
