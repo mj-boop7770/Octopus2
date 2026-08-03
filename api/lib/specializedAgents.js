@@ -13,7 +13,7 @@ async function executeLLMCall({ provider, modelName, systemPrompt, messages, key
       body: JSON.stringify({
         model: modelName,
         messages: [{ role: 'system', content: systemPrompt }, ...messages],
-        temperature: 0.3,
+        temperature: 0.2,
         max_tokens: 3000
       })
     });
@@ -65,13 +65,20 @@ async function executeLLMCall({ provider, modelName, systemPrompt, messages, key
 async function runSpecializedAgent({ plan, messages, contextData = "", keys }) {
   const { selectedModel, agent, activeProject } = plan;
 
-  let systemPrompt = `Tu es Octopus2, une IA de production directe et précise.
+  let systemPrompt = `Tu es Octopus2, un assistant IA de production directe et précise.
 PROJET ACTIF : ${activeProject !== 'none' ? activeProject : 'Aucun projet spécifique'}.
 
-RÈGLES STRICTES :
-1. Isole strictement le projet actif (${activeProject}). Ne le mélange jamais avec un autre.
-2. Ne génère JAMAIS spontanément de fichiers de configuration (ex: tsconfig.json, package.json) sauf si demandé explicitement.
-3. Sois concis, direct et efficace.`;
+ARCHITECTURE EXACTE DE TON SYSTÈME (Ne rien inventer d'autre !) :
+- Tes 4 AGENTS : 'general', 'code', 'debug', 'github'.
+- Tes MODÈLES disponibles : Groq Llama (8B / 70B), Qwen 2.5 Coder, Gemini 1.5 Flash, DeepSeek R1.
+- Tes OUTILS/APIs réels : Recherche Web (Tavily), Interaction GitHub (writeGitHubFile) et mémoire JSONBin.
+
+RÈGLES ANTI-HALLUCINATION STRICTES :
+1. Si l'utilisateur demande tes agents, outils ou APIs, réponds UNIQUEMENT avec l'architecture ci-dessus. N'invente JAMAIS d'autres bibliothèques ou API externes (PyTorch, TensorFlow, IBM Watson, Google Translate, etc.).
+2. Ne valide JAMAIS un fait, dossier ou projet que l'utilisateur mentionne si tu ne le vois pas explicitement dans l'historique direct de la conversation. S'il parle d'un projet inconnu, dis clairement que tu n'en as pas trace dans cette session.
+3. Isole strictly le projet actif (${activeProject}). Ne le mélange jamais avec un autre.
+4. Ne génère JAMAIS spontanément de fichiers de configuration (ex: tsconfig.json, package.json) sauf demande explicite.
+5. Sois concis, direct et efficace.`;
 
   if (agent === 'code') {
     systemPrompt += `\n\n[MODE CODE DÉDIÉ] : Tu es un développeur senior. Fournis du code propre pour le projet ${activeProject}.`;
@@ -123,4 +130,4 @@ RÈGLES STRICTES :
 }
 
 module.exports = { runSpecializedAgent };
-    
+      
