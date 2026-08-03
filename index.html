@@ -1,41 +1,114 @@
 <script>
-  // 1. Configuration de Marked avec bouton de copie de code intégré
+  // --- INITIALISATION DES BIBLIOTHÈQUES ---
+
+  // 1. Config Parser Markdown (Marked) avec bouton de copie de code intégré
   const renderer = new marked.Renderer();
+  
+  // Surcharge du rendu des blocs de code pour ajouter l'en-tête et le bouton
   renderer.code = function(code, language) {
     const validLang = language && hljs.getLanguage(language) ? language : 'plaintext';
     const highlighted = hljs.highlight(code, { language: validLang }).value;
+    // Génère un ID unique pour ce bloc de code
     const codeId = 'code-' + Math.random().toString(36).substr(2, 9);
     
     return `
-      <div class="relative group my-3 rounded-xl overflow-hidden border border-slate-800 bg-slate-900">
-        <div class="flex items-center justify-between px-4 py-1.5 bg-slate-800/80 text-[11px] text-slate-400 font-mono">
-          <span>${validLang}</span>
-          <button onclick="copyCode('${codeId}', this)" class="hover:text-white transition flex items-center gap-1">
-            <i class="fa-regular fa-copy"></i> Copier
+      <div class="relative group my-4 rounded-xl overflow-hidden border border-slate-800 bg-slate-900 shadow-lg">
+        <!-- En-tête du bloc de code -->
+        <div class="flex items-center justify-between px-4 py-2 bg-slate-800 text-[11px] text-slate-400 font-mono border-b border-slate-700/50">
+          <span class="uppercase">${validLang}</span>
+          <button onclick="copyCode('${codeId}', this)" class="hover:text-white transition flex items-center gap-1.5 active:scale-95">
+            <i class="fa-regular fa-copy"></i>
+            <span class="copy-text">Copier</span>
           </button>
         </div>
-        <pre class="p-4 overflow-x-auto text-xs font-mono"><code id="${codeId}">${highlighted}</code></pre>
+        <!-- Contenu du code -->
+        <pre class="p-4 overflow-x-auto custom-scrollbar text-xs font-mono line-height-relaxed"><code id="${codeId}" class="hljs language-${validLang}">${highlighted}</code></pre>
       </div>`;
   };
 
-  marked.setOptions({ renderer: renderer, breaks: true });
+  // Applique la configuration à Marked
+  marked.setOptions({ renderer: renderer, breaks: true, gfm: true });
 
-  // Fonction de copie du code
+  // 2. Initialisation d'Highlight.js
+  hljs.highlightAll();
+
+  // --- FONCTIONS UTILITAIRES GLOBALES ---
+
+  // Fonction pour copier le code dans le presse-papiers
   window.copyCode = function(id, btn) {
-    const codeText = document.getElementById(id).innerText;
+    const codeElement = document.getElementById(id);
+    if (!codeElement) return;
+    const codeText = codeElement.innerText;
+    
     navigator.clipboard.writeText(codeText).then(() => {
-      btn.innerHTML = `<i class="fa-solid fa-check text-emerald-400"></i> Copié !`;
+      // Retour visuel de succès
+      const copyTextSpan = btn.querySelector('.copy-text');
+      const copyIcon = btn.querySelector('i');
+      
+      btn.classList.add('text-emerald-400');
+      copyTextSpan.innerText = 'Copié !';
+      copyIcon.className = 'fa-solid fa-check';
+      
+      // Reset après 2 secondes
       setTimeout(() => {
-        btn.innerHTML = `<i class="fa-regular fa-copy"></i> Copier`;
+        btn.classList.remove('text-emerald-400');
+        copyTextSpan.innerText = 'Copier';
+        copyIcon.className = 'fa-regular fa-copy';
       }, 2000);
+    }).catch(err => {
+      console.error('Erreur lors de la copie : ', err);
     });
   };
 
-  // Variables globales
+  // Fonction de synthèse vocale (Audio)
+  window.speakText = function(btn) {
+    if ('speechSynthesis' in window) {
+      // Trouve le conteneur de message parent pour extraire le texte brut
+      const messageContent = btn.closest('.markdown-body').querySelector('p');
+      if (!messageContent) return;
+      
+      // Texte brut sans balises HTML
+      const textToSpeak = messageContent.innerText;
+
+      if (window.speechSynthesis.speaking && btn.classList.contains('speaking')) {
+        // Stop si on clique à nouveau sur le même bouton
+        window.speechSynthesis.cancel();
+        btn.classList.remove('speaking', 'text-indigo-400');
+        return;
+      }
+
+      // Stoppe toute lecture en cours
+      window.speechSynthesis.cancel();
+
+      // Retire l'état actif des autres boutons d'écoute
+      document.querySelectorAll('.speak-btn.speaking').forEach(b => b.classList.remove('speaking', 'text-indigo-400'));
+
+      const utterance = new SpeechSynthesisUtterance(textToSpeak);
+      utterance.lang = 'fr-FR'; // Langue
+      utterance.rate = 1.0;     // Vitesse
+
+      // Ajoute l'état actif pendant la lecture
+      btn.classList.add('speaking', 'text-indigo-400');
+
+      // Nettoyage quand la lecture finit
+      utterance.onend = () => {
+        btn.classList.remove('speaking', 'text-indigo-400');
+      };
+      utterance.onerror = () => {
+        btn.classList.remove('speaking', 'text-indigo-400');
+      };
+
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  // --- LOGIQUE PRINCIPALE DE L'INTERFACE ---
+
+  // Variables globales d'état
   let chats = JSON.parse(localStorage.getItem('octopus_chats')) || [];
   let currentChatId = null;
   let isWebSearchActive = false;
-  let currentAbortController = null; // Pour pouvoir stopper la génération
+  let currentAbortController = null; // Pour interrompre la requête
 
   // Éléments DOM
   const sidebar = document.getElementById('sidebar');
@@ -54,10 +127,10 @@
   const micBtn = document.getElementById('mic-btn');
   const sendBtn = document.getElementById('send-btn');
 
-  // Textarea Auto-resize
+  // Textarea Auto-resize (hauteur dynamique)
   userInput.addEventListener('input', function() {
     this.style.height = 'auto';
-    this.style.height = (this.scrollHeight) + 'px';
+    this.style.height = Math.min(this.scrollHeight, 128) + 'px'; // Max 128px
   });
 
   // Reconnaissance Vocale (Micro)
@@ -65,6 +138,7 @@
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.lang = 'fr-FR';
+    recognition.continuous = false; // Arrêt auto après une phrase
 
     micBtn.onclick = () => {
       recognition.start();
@@ -72,38 +146,20 @@
     };
 
     recognition.onresult = (e) => {
-      userInput.value += e.results[0][0].transcript;
-      userInput.style.height = (userInput.scrollHeight) + 'px';
+      const transcript = e.results[0][0].transcript;
+      userInput.value += transcript;
+      userInput.dispatchEvent(new Event('input')); // Trigger auto-resize
     };
 
     recognition.onerror = recognition.onend = () => {
       micBtn.classList.remove('text-indigo-400', 'animate-pulse');
     };
   } else {
+    // Cache le bouton si non supporté (ex: Firefox)
     micBtn.style.display = 'none';
   }
 
-  // Lecture Vocale (Synthèse Vocale)
-  window.speakText = function(text, btn) {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel(); // Stoppe la lecture précédente s'il y en a une
-      
-      if (btn.classList.contains('speaking')) {
-        btn.classList.remove('speaking', 'text-indigo-400');
-        return;
-      }
-
-      // Nettoie le texte des balises Markdown pour la lecture
-      const cleanText = text.replace(/[*#`_~]/g, '');
-      const utterance = new SpeechSynthesisUtterance(cleanText);
-      utterance.lang = 'fr-FR';
-
-      btn.classList.add('speaking', 'text-indigo-400');
-
-      utterance.onend = () => btn.classList.remove('speaking', 'text-indigo-400');
-      window.speechSynthesis.speak(utterance);
-    }
-  };
+  // --- GESTION DE LA SIDEBAR ---
 
   function openSidebar() {
     sidebar.classList.remove('-translate-x-full');
@@ -115,9 +171,14 @@
     sidebarOverlay.classList.add('hidden');
   }
 
-  openSidebarBtn.onclick = () => sidebar.classList.contains('-translate-x-full') ? openSidebar() : closeSidebar();
+  openSidebarBtn.onclick = (e) => {
+    e.stopPropagation();
+    sidebar.classList.contains('-translate-x-full') ? openSidebar() : closeSidebar();
+  }
   closeSidebarBtn.onclick = closeSidebar;
   sidebarOverlay.onclick = closeSidebar;
+
+  // --- GESTION DES RECHERCHES WEB ---
 
   webToggle.onclick = () => {
     isWebSearchActive = !isWebSearchActive;
@@ -125,9 +186,14 @@
     webStatus.className = isWebSearchActive ? 'text-emerald-400 font-bold' : 'text-red-400';
   };
 
+  // --- GESTION DE L'HISTORIQUE (LocalStorage) ---
+
   function saveChats() { localStorage.setItem('octopus_chats', JSON.stringify(chats)); }
 
   function createNewChat() {
+    // Stoppe l'audio en cours
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    
     const newChat = { id: Date.now().toString(), title: 'Nouvelle discussion', messages: [] };
     chats.unshift(newChat);
     currentChatId = newChat.id;
@@ -145,15 +211,16 @@
       btn.className = `p-2 rounded-xl text-xs font-medium cursor-pointer flex items-center justify-between group transition ${isActive ? 'bg-indigo-600/10 text-indigo-400' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`;
       btn.innerHTML = `
         <div class="flex items-center gap-2 truncate">
-          <i class="fa-regular fa-message text-slate-500"></i>
+          <i class="fa-regular fa-message text-slate-500 shrink-0"></i>
           <span class="truncate">${chat.title}</span>
         </div>
-        <button onclick="deleteChat(event, '${chat.id}')" class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 p-1 transition">
+        <button onclick="deleteChat(event, '${chat.id}')" class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 p-1 transition shrink-0 active:scale-95">
           <i class="fa-solid fa-trash"></i>
         </button>`;
       btn.onclick = (e) => {
         if (!e.target.closest('button')) {
           currentChatId = chat.id;
+          if ('speechSynthesis' in window) window.speechSynthesis.cancel();
           renderSidebar();
           renderMessages();
           if (window.innerWidth < 768) closeSidebar();
@@ -166,146 +233,202 @@
   function deleteChat(e, id) {
     e.stopPropagation();
     chats = chats.filter(c => c.id !== id);
-    currentChatId = chats.length > 0 ? chats[0].id : null;
+    if (currentChatId === id) {
+      currentChatId = chats.length > 0 ? chats[0].id : null;
+    }
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
     saveChats();
     if (!currentChatId) createNewChat();
     else { renderSidebar(); renderMessages(); }
   }
+
+  // --- GESTION DE L'AFFICHAGE DES MESSAGES ---
 
   function renderMessages() {
     const current = chats.find(c => c.id === currentChatId);
     if (!current) return;
     if (currentChatTitle) currentChatTitle.textContent = current.title;
 
+    // Écran d'accueil si pas de messages
     if (current.messages.length === 0) {
       messagesContainer.innerHTML = `
-        <div class="h-full flex flex-col items-center justify-center text-center text-slate-500 my-auto py-12">
-          <div class="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-2xl mb-4 text-indigo-400">🐙</div>
-          <h2 class="text-xl font-semibold text-slate-200 mb-2">Bonjour ! Comment puis-je vous aider ?</h2>
+        <div class="h-full flex flex-col items-center justify-center text-center text-slate-500 py-16 px-4">
+          <div class="w-16 h-16 rounded-3xl bg-slate-900 border border-slate-800 flex items-center justify-center text-3xl mb-5 text-indigo-400 shadow-inner">🐙</div>
+          <h2 class="text-2xl font-semibold text-slate-200 mb-2">Bonjour ! Comment puis-je vous aider ?</h2>
           <p class="text-xs max-w-sm text-slate-400 leading-relaxed">Posez vos questions, générez du code ou créez des visuels en toute simplicité.</p>
         </div>`;
       return;
     }
 
     messagesContainer.innerHTML = '';
-    current.messages.forEach((m, idx) => {
+    current.messages.forEach((m) => {
       const isUser = m.role === 'user';
       const msgDiv = document.createElement('div');
       msgDiv.className = `flex gap-3 sm:gap-4 ${isUser ? 'justify-end' : 'justify-start'}`;
       
-      let contentHtml = isUser 
-        ? `<div class="bg-indigo-600 text-white p-3.5 rounded-2xl text-xs sm:text-sm max-w-[85%] whitespace-pre-wrap">${escapeHtml(m.content)}</div>`
-        : `<div class="flex-1 bg-transparent text-slate-200 text-xs sm:text-sm markdown-body overflow-hidden">
-            ${marked.parse(m.content)}
-            <div class="flex items-center gap-2 mt-2 pt-2 border-t border-slate-800/40 text-slate-500 text-xs">
-              <button onclick="speakText(\`${escapeHtml(m.content)}\`, this)" class="hover:text-slate-300 transition flex items-center gap-1 text-[11px]">
+      let contentHtml = '';
+      if (isUser) {
+        // Message Utilisateur : simple texte avec fond indigo
+        contentHtml = `<div class="bg-indigo-600 text-white p-3.5 rounded-2xl rounded-br-none text-xs sm:text-sm max-w-[85%] whitespace-pre-wrap shadow-md break-words">${escapeHtml(m.content)}</div>`;
+      } else {
+        // Message IA : Markdown rendu
+        contentHtml = `
+          <div class="flex-1 bg-transparent text-slate-200 text-xs sm:text-sm markdown-body overflow-hidden">
+            <!-- Contenu Markdown -->
+            <div class="response-text">${marked.parse(m.content)}</div>
+            
+            <!-- Actions sous la réponse -->
+            <div class="flex items-center gap-3 mt-3 pt-2.5 border-t border-slate-800/60 text-slate-500">
+              <button onclick="speakText(this)" class="speak-btn hover:text-slate-300 transition flex items-center gap-1.5 text-[11px] font-medium active:scale-95">
                 <i class="fa-solid fa-volume-high"></i> Écouter
               </button>
             </div>
-           </div>`;
+          </div>`;
+      }
 
       msgDiv.innerHTML = `
-        ${!isUser ? `<div class="w-7 h-7 rounded-lg bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center text-xs shrink-0 font-bold">🐙</div>` : ''}
+        ${!isUser ? `<div class="w-8 h-8 rounded-xl bg-slate-900 border border-slate-800 text-indigo-400 flex items-center justify-center text-sm shrink-0 font-bold shadow-md">🐙</div>` : ''}
         ${contentHtml}
       `;
       messagesContainer.appendChild(msgDiv);
     });
 
+    // Auto-scroll vers le bas
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
   }
 
+  // Utilitaire pour échapper le HTML (sécurité)
   function escapeHtml(text) { 
+    if (!text) return "";
     return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); 
   }
 
-  // Soumission du Formulaire
+  // --- GESTION DE L'ENVOI ET DE L'ARRÊT (STOP) ---
+
   chatForm.onsubmit = async (e) => {
     e.preventDefault();
 
-    // Si une génération est en cours, le bouton sert d'arrêt (Stop)
+    // 1. GESTION DU BOUTON STOP (Interrompre)
     if (currentAbortController) {
-      currentAbortController.abort();
+      currentAbortController.abort(); // Coupe la requête réseau
       currentAbortController = null;
+      
+      // Ajoute une mention d'arrêt dans la conversation
+      const current = chats.find(c => c.id === currentChatId);
+      current.messages.push({ role: 'bot', content: '🛑 *Génération interrompue par l\'utilisateur.*' });
+      
+      // Cleanup de l'UI
+      const loadingDiv = document.querySelector('.loading-message');
+      if (loadingDiv) loadingDiv.remove();
+      
       resetSendButton();
+      saveChats();
+      renderMessages();
       return;
     }
 
     const content = userInput.value.trim();
     if (!content) return;
 
+    // Initialisation nouvelle discussion si nécessaire
     if (!currentChatId) createNewChat();
     const current = chats.find(c => c.id === currentChatId);
 
+    // Titre auto basé sur le 1er message
     if (current.messages.length === 0) {
       current.title = content.slice(0, 25) + (content.length > 25 ? '...' : '');
     }
 
+    // Ajout message utilisateur
     current.messages.push({ role: 'user', content });
     userInput.value = '';
-    userInput.style.height = 'auto';
+    userInput.style.height = 'auto'; // Reset hauteur
     saveChats();
     renderSidebar();
     renderMessages();
 
-    // Basculer le bouton en mode "Arrêter" (Stop)
+    // 2. Bascule du bouton en mode "Stop"
     setStopButton();
 
+    // Ajout indicateur de chargement
     const loadingDiv = document.createElement('div');
-    loadingDiv.className = 'flex gap-3 justify-start';
+    loadingDiv.className = 'flex gap-3 justify-start loading-message';
     loadingDiv.innerHTML = `
-      <div class="w-7 h-7 rounded-lg bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center text-xs shrink-0 font-bold">🐙</div>
-      <div class="text-xs text-slate-400 flex items-center gap-2 pt-1.5">
-        <i class="fa-solid fa-spinner fa-spin text-indigo-400"></i> Réflexion en cours...
+      <div class="w-8 h-8 rounded-xl bg-slate-900 border border-slate-800 text-indigo-400 flex items-center justify-center text-sm shrink-0 font-bold shadow-md">🐙</div>
+      <div class="text-xs text-slate-400 flex items-center gap-2.5 pt-2">
+        <i class="fa-solid fa-circle-notch fa-spin text-indigo-400"></i> ${isWebSearchActive ? 'Recherche en direct...' : 'Réflexion...'}
       </div>`;
     messagesContainer.appendChild(loadingDiv);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
+    // Initialisation du contrôleur d'interruption
     currentAbortController = new AbortController();
 
     try {
+      // Envoi de la requête au serveur
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        signal: currentAbortController.signal,
-        body: JSON.stringify({ messages: current.messages, mode: modeSelect.value, webSearch: isWebSearchActive })
+        signal: currentAbortController.signal, // Attache le signal pour le Stop
+        body: JSON.stringify({ 
+          messages: current.messages, 
+          mode: modeSelect.value, 
+          webSearch: isWebSearchActive 
+        })
       });
 
       const data = await res.json();
-      loadingDiv.remove();
+      loadingDiv.remove(); // Cleanup chargement
 
       if (res.ok && data.reply) {
+        // Enregistre la réponse de l'IA
         current.messages.push({ role: 'bot', content: data.reply });
+      } else if (res.status === 429) {
+        current.messages.push({ role: 'bot', content: '⚠️ *Quota dépassé. Veuillez réessayer dans quelques instants.*' });
       } else {
-        current.messages.push({ role: 'bot', content: `⚠️ Erreur : ${data.error || 'Impossible de répondre'}` });
+        current.messages.push({ role: 'bot', content: `⚠️ *Erreur serveur* : ${data.error || 'Impossible de répondre'}` });
       }
     } catch (err) {
+      // Cleanup chargement en cas d'erreur
       loadingDiv.remove();
+      
       if (err.name === 'AbortError') {
-        current.messages.push({ role: 'bot', content: '🛑 *Génération interrompue.*' });
+        // Cas déjà géré dans la logique du bouton Stop (haut de fonction)
+        console.log('Génération interrompue proprement.');
       } else {
-        current.messages.push({ role: 'bot', content: '⚠️ Connexion interrompue.' });
+        current.messages.push({ role: 'bot', content: '⚠️ *Erreur de connexion.* Vérifiez votre réseau ou le déploiement sur Vercel.' });
       }
     }
 
+    // Cleanup final
     currentAbortController = null;
-    resetSendButton();
+    resetSendButton(); // Repasse en mode "Envoyer"
     saveChats();
     renderMessages();
   };
 
+  // Met le bouton Envoyer en rouge pour l'arrêt
   function setStopButton() {
     sendBtn.innerHTML = `<i class="fa-solid fa-square text-xs"></i> Stop`;
-    sendBtn.className = 'bg-red-600 hover:bg-red-500 text-white rounded-xl px-3 py-1.5 transition text-xs font-medium flex items-center gap-1.5 shadow-md';
+    sendBtn.className = 'bg-red-600 hover:bg-red-500 text-white rounded-xl px-3 py-2 transition text-xs font-medium flex items-center gap-1.5 shadow-md active:scale-95';
   }
 
+  // Repasse le bouton en mode indigo classique
   function resetSendButton() {
     sendBtn.innerHTML = `<span>Envoyer</span><i class="fa-solid fa-paper-plane text-[10px]"></i>`;
-    sendBtn.className = 'bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-3 py-1.5 transition text-xs font-medium flex items-center gap-1.5 shadow-md';
+    sendBtn.className = 'bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-3 py-2 transition text-xs font-medium flex items-center gap-1.5 shadow-md active:scale-95';
   }
+
+  // --- CHARGEMENT INITIAL DE L'APP ---
 
   newChatBtn.onclick = createNewChat;
 
-  if (chats.length === 0) createNewChat();
-  else { currentChatId = chats[0].id; renderSidebar(); renderMessages(); }
-      </script>
-      
+  if (chats.length === 0) {
+    createNewChat(); // Charge une discussion vierge si historique vide
+  } else {
+    currentChatId = chats[0].id; // Charge la discussion la plus récente
+    renderSidebar();
+    renderMessages();
+  }
+  </script>
+  
