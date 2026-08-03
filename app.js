@@ -1,19 +1,31 @@
 // js/app.js
 
-// 1. Initialisation des variables globales
-let currentAgent = AGENTS[0] || { id: 'default', type: 'text' }; // Agent par défaut
+let currentAgent = { id: 'default', type: 'text' };
 
 document.addEventListener('DOMContentLoaded', () => {
   const messageInput = document.getElementById('message-input');
   const sendBtn = document.getElementById('send-btn');
-  const chatMessages = document.getElementById('chat-messages');
+  const agentSelect = document.getElementById('agent-select') || document.querySelector('select');
 
-  // Écouteur sur le bouton d'envoi
+  // Si l'utilisateur change d'agent dans le menu déroulant
+  if (agentSelect) {
+    agentSelect.addEventListener('change', (e) => {
+      const selectedId = e.target.value;
+      const foundAgent = AGENTS.find(a => a.id === selectedId);
+      if (foundAgent) {
+        currentAgent = foundAgent;
+      } else if (selectedId.includes('music') || selectedId.includes('audio') || selectedId.includes('maestro')) {
+        currentAgent = { id: 'music-maestro', type: 'audio' };
+      } else {
+        currentAgent = { id: selectedId, type: 'text' };
+      }
+    });
+  }
+
   if (sendBtn) {
     sendBtn.addEventListener('click', handleSendMessage);
   }
 
-  // Écouteur sur la touche Entrée
   if (messageInput) {
     messageInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -24,28 +36,31 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-// 2. Fonction principale d'envoi de message
 async function handleSendMessage() {
   const messageInput = document.getElementById('message-input');
   const userInput = messageInput.value.trim();
 
   if (!userInput) return;
 
-  // Affiche le message de l'utilisateur dans le chat
+  // Récupérer le mode actif depuis le dropdown s'il existe
+  const agentSelect = document.getElementById('agent-select') || document.querySelector('select');
+  const selectedMode = agentSelect ? agentSelect.value.toLowerCase() : '';
+
   appendUserMessage(userInput);
   messageInput.value = '';
 
-  // Sélection du comportement selon le type d'agent (Audio ou Texte)
-  if (currentAgent.id === 'music-maestro' || currentAgent.type === 'audio') {
+  // DÉTECTION STRICTE : Si l'agent actif est 'audio', OU si le menu est sur musique, OU si l'utilisateur demande explicitement une génération audio
+  const isAudioAgent = currentAgent.type === 'audio' || currentAgent.id === 'music-maestro' || selectedMode.includes('music') || selectedMode.includes('audio');
+
+  if (isAudioAgent) {
     await handleAudioGeneration(userInput);
   } else {
     await handleTextGeneration(userInput);
   }
 }
 
-// 3. Gestion de la génération AUDIO (Hugging Face)
 async function handleAudioGeneration(promptText) {
-  showLoadingIndicator('🎵 Composition du morceau en cours... Patientez un instant.');
+  showLoadingIndicator('🎵 Génération du fichier audio (.wav) en cours... Veuillez patienter.');
 
   try {
     const response = await fetch('/api/music', {
@@ -65,23 +80,20 @@ async function handleAudioGeneration(promptText) {
     const audioUrl = URL.createObjectURL(audioBlob);
 
     hideLoadingIndicator();
-
-    // Affiche la carte lecteur audio dans le chat
     appendAudioCard({ promptText, audioUrl });
 
   } catch (error) {
     console.error('Erreur Audio:', error);
     hideLoadingIndicator();
-    appendErrorMessage('Désolé, impossible de composer la musique. Veuillez réessayer.');
+    appendErrorMessage('Désolé, impossible de composer la musique sur Hugging Face. Réessayez.');
   }
 }
 
-// 4. Gestion de la génération TEXTE (Groq)
 async function handleTextGeneration(promptText) {
   showLoadingIndicator('Octopus réfléchit...');
 
   try {
-    const response = await fetch('/api/chat', { // adapte le chemin si ton API s'appelle autrement
+    const response = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -106,10 +118,9 @@ async function handleTextGeneration(promptText) {
   }
 }
 
-// 5. Fonctions d'affichage dans le chat (UI)
-
 function appendUserMessage(text) {
   const chatMessages = document.getElementById('chat-messages');
+  if (!chatMessages) return;
   const msgDiv = document.createElement('div');
   msgDiv.className = 'flex justify-end my-2';
   msgDiv.innerHTML = `
@@ -123,6 +134,7 @@ function appendUserMessage(text) {
 
 function appendBotMessage(text) {
   const chatMessages = document.getElementById('chat-messages');
+  if (!chatMessages) return;
   const msgDiv = document.createElement('div');
   msgDiv.className = 'flex justify-start my-2';
   msgDiv.innerHTML = `
@@ -134,8 +146,23 @@ function appendBotMessage(text) {
   scrollToBottom();
 }
 
+function appendErrorMessage(text) {
+  const chatMessages = document.getElementById('chat-messages');
+  if (!chatMessages) return;
+  const msgDiv = document.createElement('div');
+  msgDiv.className = 'flex justify-start my-2';
+  msgDiv.innerHTML = `
+    <div class="bg-red-900/60 text-red-200 p-3 rounded-2xl text-xs border border-red-700">
+      ⚠️ ${escapeHtml(text)}
+    </div>
+  `;
+  chatMessages.appendChild(msgDiv);
+  scrollToBottom();
+}
+
 function appendAudioCard({ promptText, audioUrl }) {
   const chatMessages = document.getElementById('chat-messages');
+  if (!chatMessages) return;
   const card = document.createElement('div');
   card.className = 'flex justify-start my-3';
 
@@ -169,6 +196,7 @@ function appendAudioCard({ promptText, audioUrl }) {
 
 function showLoadingIndicator(text) {
   const chatMessages = document.getElementById('chat-messages');
+  if (!chatMessages) return;
   let loader = document.getElementById('loading-indicator');
   
   if (!loader) {
@@ -193,14 +221,13 @@ function hideLoadingIndicator() {
 
 function scrollToBottom() {
   const chatMessages = document.getElementById('chat-messages');
-  if (chatMessages) {
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-  }
+  if (!chatMessages) return;
+  chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 function escapeHtml(text) {
   const div = document.createElement('div');
   div.innerText = text;
   return div.innerHTML;
-        }
+    }
       
