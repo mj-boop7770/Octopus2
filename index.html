@@ -5,52 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>🐙 MUJOS-OCTOPUS2</title>
     
-    <!-- Font Awesome 6 (gratuit) -->
+    <!-- Font Awesome 6 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-    <!-- Highlight.js pour la coloration syntaxique -->
+    <!-- Highlight.js -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-    <!-- Marked pour le Markdown -->
+    <!-- Marked -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/11.0.0/marked.min.js"></script>
-    
-    <!-- Tailwind CSS via CDN -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
     <style>
-        /* Styles personnalisés pour le chat */
         body { background: #0f0f13; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
-        .markdown-body p { margin: 0.5rem 0; }
-        .markdown-body pre { margin: 0 !important; }
-        .markdown-body code { font-size: 0.75rem; }
         .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #1e1e24; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #4f46e5; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #6366f1; }
-        
-        /* Animation de transition pour la sidebar */
-        #sidebar { transition: transform 0.3s ease-in-out; }
-        
-        /* Ajustement des messages */
-        .markdown-body { 
-            color: #e2e8f0; 
-            font-size: 0.875rem; 
-            line-height: 1.6; 
-        }
-        .markdown-body h1, .markdown-body h2, .markdown-body h3 { 
-            color: #f1f5f9; 
-            font-weight: 600; 
-            margin: 0.75rem 0 0.5rem; 
-        }
-        .markdown-body ul, .markdown-body ol { 
-            padding-left: 1.5rem; 
-            margin: 0.5rem 0; 
-        }
-        .markdown-body blockquote { 
-            border-left: 3px solid #4f46e5; 
-            padding-left: 1rem; 
-            color: #94a3b8; 
-            margin: 0.5rem 0; 
-        }
+        .markdown-body { color: #e2e8f0; font-size: 0.875rem; line-height: 1.6; }
+        .markdown-body p { margin: 0.5rem 0; }
+        .markdown-body h1, .markdown-body h2, .markdown-body h3 { color: #f1f5f9; font-weight: 600; margin: 0.75rem 0 0.5rem; }
+        .markdown-body ul, .markdown-body ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+        .markdown-body blockquote { border-left: 3px solid #4f46e5; padding-left: 1rem; color: #94a3b8; margin: 0.5rem 0; }
         .markdown-body a { color: #818cf8; text-decoration: underline; }
         .markdown-body table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; }
         .markdown-body th, .markdown-body td { border: 1px solid #334155; padding: 0.4rem 0.75rem; text-align: left; }
@@ -59,12 +33,11 @@
 </head>
 <body>
 
-    <!-- OVERLAY (fond sombre mobile) -->
+    <!-- OVERLAY MOBILE -->
     <div id="sidebar-overlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 hidden md:hidden"></div>
 
-    <!-- SIDEBAR (gauche) -->
-    <aside id="sidebar" class="fixed top-0 left-0 z-50 h-full w-72 bg-[#14141a] border-r border-slate-800/60 shadow-2xl -translate-x-full md:translate-x-0 flex flex-col">
-        <!-- En-tête sidebar -->
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="fixed top-0 left-0 z-50 h-full w-72 bg-[#14141a] border-r border-slate-800/60 shadow-2xl -translate-x-full md:translate-x-0 flex flex-col transition-transform duration-300">
         <div class="flex items-center justify-between px-5 py-4 border-b border-slate-800/60">
             <div class="flex items-center gap-2.5">
                 <span class="text-xl">🐙</span>
@@ -76,17 +49,14 @@
             </button>
         </div>
         
-        <!-- Nouvelle discussion -->
         <div class="px-3 pt-3">
             <button id="new-chat-btn" class="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-4 py-2.5 text-xs font-medium transition shadow-md active:scale-95">
                 <i class="fa-solid fa-plus"></i> Nouvelle discussion
             </button>
         </div>
         
-        <!-- Liste des discussions -->
         <div id="chat-list" class="flex-1 overflow-y-auto custom-scrollbar px-3 py-4 space-y-1.5"></div>
         
-        <!-- Pied de sidebar -->
         <div class="border-t border-slate-800/60 px-5 py-3 text-[10px] text-slate-500 flex items-center justify-between">
             <span>🧠 MUJOS-OCTOPUS2</span>
             <span class="flex items-center gap-1.5">
@@ -98,8 +68,7 @@
 
     <!-- ZONE PRINCIPALE -->
     <main class="md:ml-72 h-screen flex flex-col bg-[#0b0b10]">
-
-        <!-- Header -->
+        <!-- HEADER -->
         <header class="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-slate-800/50 bg-[#0f0f13]/80 backdrop-blur-sm sticky top-0 z-20">
             <div class="flex items-center gap-3">
                 <button id="open-sidebar-btn" class="md:hidden text-slate-400 hover:text-slate-200 transition text-lg">
@@ -121,17 +90,31 @@
             </div>
         </header>
 
-        <!-- Messages -->
+        <!-- MESSAGES -->
         <div id="messages-container" class="flex-1 overflow-y-auto custom-scrollbar px-4 sm:px-8 py-6 space-y-5"></div>
 
-        <!-- Zone de saisie -->
+        <!-- PRÉVISUALISATION FICHIER JOINT -->
+        <div id="file-preview-container" class="hidden px-4 sm:px-8 py-2 bg-slate-900/40 border-t border-slate-800/40 flex items-center gap-3">
+            <div id="file-preview-content" class="text-xs text-slate-300 bg-slate-800 px-3 py-1.5 rounded-lg flex items-center gap-2"></div>
+            <button id="remove-file-btn" class="text-slate-500 hover:text-red-400 text-xs"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <!-- ZONE DE SAISIE -->
         <div class="border-t border-slate-800/50 bg-[#0f0f13] px-4 sm:px-8 py-4">
-            <form id="chat-form" class="max-w-4xl mx-auto flex items-end gap-2.5 bg-slate-900/70 border border-slate-800/60 rounded-2xl p-1.5 shadow-lg focus-within:border-indigo-500/50 transition">
-                <button id="mic-btn" type="button" class="text-slate-500 hover:text-indigo-400 transition px-2 py-2.5 text-sm active:scale-95" title="Dictée vocale">
+            <form id="chat-form" class="max-w-4xl mx-auto flex items-end gap-2 bg-slate-900/70 border border-slate-800/60 rounded-2xl p-1.5 shadow-lg focus-within:border-indigo-500/50 transition">
+                
+                <!-- BOUTON PIÈCE JOINTE -->
+                <label for="file-input" class="text-slate-500 hover:text-indigo-400 transition p-2 text-sm cursor-pointer active:scale-95 flex items-center justify-center" title="Joindre une image ou un fichier">
+                    <i class="fa-solid fa-paperclip"></i>
+                </label>
+                <input type="file" id="file-input" class="hidden" accept="image/*, application/pdf, text/plain">
+
+                <!-- BOUTON MICRO -->
+                <button id="mic-btn" type="button" class="text-slate-500 hover:text-indigo-400 transition p-2 text-sm active:scale-95" title="Dictée vocale">
                     <i class="fa-solid fa-microphone"></i>
                 </button>
                 
-                <textarea id="user-input" rows="1" placeholder="Posez votre question..." class="flex-1 bg-transparent text-slate-200 text-sm placeholder:text-slate-500 outline-none resize-none py-2.5 min-h-[42px] max-h-32 leading-relaxed custom-scrollbar"></textarea>
+                <textarea id="user-input" rows="1" placeholder="Posez votre question..." class="flex-1 bg-transparent text-slate-200 text-sm placeholder:text-slate-500 outline-none resize-none py-2 min-h-[40px] max-h-32 leading-relaxed custom-scrollbar"></textarea>
                 
                 <button id="send-btn" type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-3 py-2 transition text-xs font-medium flex items-center gap-1.5 shadow-md active:scale-95">
                     <span>Envoyer</span>
@@ -139,16 +122,15 @@
                 </button>
             </form>
             <p class="text-center text-[10px] text-slate-500 mt-2.5 tracking-wide">
-                ⚡ Réponses locales · Code & Markdown · <span class="text-indigo-400">🐙 MUJOS-OCTOPUS2</span>
+                ⚡ Connecté au serveur Vercel · Code & Vision · <span class="text-indigo-400">🐙 MUJOS-OCTOPUS2</span>
             </p>
         </div>
     </main>
 
-    <!-- SCRIPT JS -->
+    <!-- LOGIQUE JAVASCRIPT CORRIGÉE -->
     <script>
-        // 1. Config Parser Markdown (Marked)
+        // Config Markdown & Syntax Highlighting
         const renderer = new marked.Renderer();
-
         renderer.code = function(code, language) {
             const validLang = language && hljs.getLanguage(language) ? language : 'plaintext';
             const highlighted = hljs.highlight(code, { language: validLang }).value;
@@ -158,75 +140,44 @@
                 <div class="relative group my-4 rounded-xl overflow-hidden border border-slate-800 bg-slate-900 shadow-lg">
                     <div class="flex items-center justify-between px-4 py-2 bg-slate-800 text-[11px] text-slate-400 font-mono border-b border-slate-700/50">
                         <span class="uppercase">${validLang}</span>
-                        <button onclick="copyCode('${codeId}', this)" class="hover:text-white transition flex items-center gap-1.5 active:scale-95">
-                            <i class="fa-regular fa-copy"></i>
-                            <span class="copy-text">Copier</span>
+                        <button onclick="copyCode('${codeId}', this)" class="hover:text-white transition flex items-center gap-1.5">
+                            <i class="fa-regular fa-copy"></i> <span class="copy-text">Copier</span>
                         </button>
                     </div>
-                    <pre class="p-4 overflow-x-auto custom-scrollbar text-xs font-mono line-height-relaxed"><code id="${codeId}" class="hljs language-${validLang}">${highlighted}</code></pre>
+                    <pre class="p-4 overflow-x-auto custom-scrollbar text-xs font-mono"><code id="${codeId}" class="hljs language-${validLang}">${highlighted}</code></pre>
                 </div>`;
         };
-
         marked.setOptions({ renderer: renderer, breaks: true, gfm: true });
-        hljs.highlightAll();
 
-        // 2. Fonctions globales
+        // Utilitaires de copie et lecture vocale
         window.copyCode = function(id, btn) {
             const codeElement = document.getElementById(id);
             if (!codeElement) return;
-            const codeText = codeElement.innerText;
-
-            navigator.clipboard.writeText(codeText).then(() => {
-                const copyTextSpan = btn.querySelector('.copy-text');
-                const copyIcon = btn.querySelector('i');
-
-                btn.classList.add('text-emerald-400');
-                copyTextSpan.innerText = 'Copié !';
-                copyIcon.className = 'fa-solid fa-check';
-
-                setTimeout(() => {
-                    btn.classList.remove('text-emerald-400');
-                    copyTextSpan.innerText = 'Copier';
-                    copyIcon.className = 'fa-regular fa-copy';
-                }, 2000);
+            navigator.clipboard.writeText(codeElement.innerText).then(() => {
+                const span = btn.querySelector('.copy-text');
+                span.innerText = 'Copié !';
+                setTimeout(() => span.innerText = 'Copier', 2000);
             });
         };
 
         window.speakText = function(btn) {
             if ('speechSynthesis' in window) {
-                const messageContainer = btn.closest('.markdown-body');
-                if (!messageContainer) return;
-
-                const textToSpeak = messageContainer.innerText;
-
-                if (window.speechSynthesis.speaking && btn.classList.contains('speaking')) {
-                    window.speechSynthesis.cancel();
-                    btn.classList.remove('speaking', 'text-indigo-400');
-                    return;
-                }
-
+                const container = btn.closest('.markdown-body');
+                if (!container) return;
                 window.speechSynthesis.cancel();
-                document.querySelectorAll('.speak-btn.speaking').forEach(b => b.classList.remove('speaking', 'text-indigo-400'));
-
-                const utterance = new SpeechSynthesisUtterance(textToSpeak);
+                const utterance = new SpeechSynthesisUtterance(container.innerText);
                 utterance.lang = 'fr-FR';
-                utterance.rate = 1.0;
-
-                btn.classList.add('speaking', 'text-indigo-400');
-
-                utterance.onend = utterance.onerror = () => {
-                    btn.classList.remove('speaking', 'text-indigo-400');
-                };
-
                 window.speechSynthesis.speak(utterance);
             }
         };
 
-        // 3. Logique d'interface & État
+        // État Global
         let chats = JSON.parse(localStorage.getItem('octopus_chats')) || [];
         let currentChatId = null;
         let isWebSearchActive = false;
+        let selectedFileData = null;
 
+        // Éléments DOM
         const sidebar = document.getElementById('sidebar');
         const sidebarOverlay = document.getElementById('sidebar-overlay');
         const openSidebarBtn = document.getElementById('open-sidebar-btn');
@@ -241,75 +192,62 @@
         const newChatBtn = document.getElementById('new-chat-btn');
         const currentChatTitle = document.getElementById('current-chat-title');
         const micBtn = document.getElementById('mic-btn');
+        const fileInput = document.getElementById('file-input');
+        const filePreviewContainer = document.getElementById('file-preview-container');
+        const filePreviewContent = document.getElementById('file-preview-content');
+        const removeFileBtn = document.getElementById('remove-file-btn');
 
-        // Auto-resize textarea
+        // Gestion de l'upload de fichier
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                selectedFileData = {
+                    name: file.name,
+                    type: file.type,
+                    data: evt.target.result // Base64
+                };
+                filePreviewContent.innerHTML = `<i class="fa-solid fa-file font-indigo-400"></i> ${file.name}`;
+                filePreviewContainer.classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+        });
+
+        removeFileBtn.onclick = () => {
+            selectedFileData = null;
+            fileInput.value = '';
+            filePreviewContainer.classList.add('hidden');
+        };
+
+        // Redimensionnement du textarea
         userInput.addEventListener('input', function() {
             this.style.height = 'auto';
             this.style.height = Math.min(this.scrollHeight, 128) + 'px';
         });
 
-        // Micro
-        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            const recognition = new SpeechRecognition();
-            recognition.lang = 'fr-FR';
-            recognition.continuous = false;
+        // Contrôle Sidebar & Web Search
+        openSidebarBtn.onclick = () => { sidebar.classList.remove('-translate-x-full'); sidebarOverlay.classList.remove('hidden'); };
+        closeSidebarBtn.onclick = () => { sidebar.classList.add('-translate-x-full'); sidebarOverlay.classList.add('hidden'); };
+        sidebarOverlay.onclick = closeSidebarBtn.onclick;
 
-            micBtn.onclick = () => {
-                recognition.start();
-                micBtn.classList.add('text-indigo-400', 'animate-pulse');
-            };
-
-            recognition.onresult = (e) => {
-                const transcript = e.results[0][0].transcript;
-                userInput.value += transcript;
-                userInput.dispatchEvent(new Event('input'));
-            };
-
-            recognition.onerror = recognition.onend = () => {
-                micBtn.classList.remove('text-indigo-400', 'animate-pulse');
-            };
-        } else {
-            micBtn.style.display = 'none';
-        }
-
-        // Navigation Sidebar
-        function openSidebar() {
-            sidebar.classList.remove('-translate-x-full');
-            sidebarOverlay.classList.remove('hidden');
-        }
-
-        function closeSidebar() {
-            sidebar.classList.add('-translate-x-full');
-            sidebarOverlay.classList.add('hidden');
-        }
-
-        openSidebarBtn.onclick = (e) => {
-            e.stopPropagation();
-            sidebar.classList.contains('-translate-x-full') ? openSidebar() : closeSidebar();
-        };
-        closeSidebarBtn.onclick = closeSidebar;
-        sidebarOverlay.onclick = closeSidebar;
-
-        // Toggle Web
         webToggle.onclick = () => {
             isWebSearchActive = !isWebSearchActive;
             webStatus.textContent = isWebSearchActive ? 'ON' : 'OFF';
             webStatus.className = isWebSearchActive ? 'text-emerald-400 font-bold' : 'text-red-400';
         };
 
-        // LocalStorage & Chats
+        // Gestion des chats
         function saveChats() { localStorage.setItem('octopus_chats', JSON.stringify(chats)); }
 
         function createNewChat() {
-            if ('speechSynthesis' in window) window.speechSynthesis.cancel();
             const newChat = { id: Date.now().toString(), title: 'Nouvelle discussion', messages: [] };
             chats.unshift(newChat);
             currentChatId = newChat.id;
             saveChats();
             renderSidebar();
             renderMessages();
-            if (window.innerWidth < 768) closeSidebar();
         }
 
         function renderSidebar() {
@@ -317,22 +255,18 @@
             chats.forEach(chat => {
                 const btn = document.createElement('div');
                 const isActive = chat.id === currentChatId;
-                btn.className = `p-2 rounded-xl text-xs font-medium cursor-pointer flex items-center justify-between group transition ${isActive ? 'bg-indigo-600/10 text-indigo-400' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`;
+                btn.className = `p-2 rounded-xl text-xs font-medium cursor-pointer flex items-center justify-between transition ${isActive ? 'bg-indigo-600/10 text-indigo-400' : 'text-slate-400 hover:bg-slate-800/50'}`;
                 btn.innerHTML = `
                     <div class="flex items-center gap-2 truncate">
-                        <i class="fa-regular fa-message text-slate-500 shrink-0"></i>
+                        <i class="fa-regular fa-message text-slate-500"></i>
                         <span class="truncate">${chat.title}</span>
                     </div>
-                    <button onclick="deleteChat(event, '${chat.id}')" class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 p-1 transition shrink-0 active:scale-95">
-                        <i class="fa-solid fa-trash"></i>
-                    </button>`;
+                    <button onclick="deleteChat(event, '${chat.id}')" class="text-slate-500 hover:text-red-400 p-1"><i class="fa-solid fa-trash"></i></button>`;
                 btn.onclick = (e) => {
                     if (!e.target.closest('button')) {
                         currentChatId = chat.id;
-                        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
                         renderSidebar();
                         renderMessages();
-                        if (window.innerWidth < 768) closeSidebar();
                     }
                 };
                 chatListEl.appendChild(btn);
@@ -342,108 +276,120 @@
         window.deleteChat = function(e, id) {
             e.stopPropagation();
             chats = chats.filter(c => c.id !== id);
-            if (currentChatId === id) {
-                currentChatId = chats.length > 0 ? chats[0].id : null;
-            }
+            currentChatId = chats.length > 0 ? chats[0].id : null;
             saveChats();
-            if (!currentChatId && chats.length === 0) {
-                createNewChat();
-            } else {
-                renderSidebar();
-                renderMessages();
-            }
+            if (!currentChatId) createNewChat(); else { renderSidebar(); renderMessages(); }
         };
 
         newChatBtn.onclick = createNewChat;
 
-        // Rendu des messages
         function renderMessages() {
             messagesContainer.innerHTML = '';
             const activeChat = chats.find(c => c.id === currentChatId);
-            
             if (!activeChat) return;
 
             currentChatTitle.textContent = activeChat.title;
 
-            if (activeChat.messages.length === 0) {
-                messagesContainer.innerHTML = `
-                    <div class="h-full flex flex-col items-center justify-center text-center text-slate-500 space-y-3 py-12">
-                        <div class="text-4xl">🐙</div>
-                        <p class="text-sm">Posez votre question pour démarrer la discussion.</p>
-                    </div>`;
-                return;
-            }
-
             activeChat.messages.forEach(msg => {
-                const msgDiv = document.createElement('div');
                 const isUser = msg.role === 'user';
-                
+                const msgDiv = document.createElement('div');
                 msgDiv.className = `flex gap-3 max-w-3xl ${isUser ? 'ml-auto flex-row-reverse' : 'mr-auto'}`;
                 
+                let fileHtml = '';
+                if (msg.file) {
+                    fileHtml = msg.file.type.startsWith('image/') 
+                        ? `<img src="${msg.file.data}" class="max-w-xs rounded-lg my-2 border border-slate-700" />`
+                        : `<div class="text-xs bg-slate-800 p-2 rounded my-1"><i class="fa-solid fa-paperclip"></i> ${msg.file.name}</div>`;
+                }
+
                 msgDiv.innerHTML = `
-                    <div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs ${isUser ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-indigo-400 border border-slate-700'}">
+                    <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs ${isUser ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-indigo-400 border border-slate-700'}">
                         ${isUser ? '<i class="fa-solid fa-user"></i>' : '🐙'}
                     </div>
                     <div class="space-y-1.5 max-w-[85%]">
                         <div class="p-3.5 rounded-2xl ${isUser ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-slate-900 border border-slate-800 text-slate-200 rounded-tl-none'} shadow-sm">
-                            <div class="markdown-body">${isUser ? msg.content : marked.parse(msg.content)}</div>
+                            ${fileHtml}
+                            <div class="markdown-body">${isUser ? escapeHtml(msg.content) : marked.parse(msg.content)}</div>
                         </div>
-                        ${!isUser ? `
-                            <div class="flex items-center gap-2 px-1 text-slate-500 text-[11px]">
-                                <button onclick="speakText(this)" class="speak-btn hover:text-indigo-400 transition flex items-center gap-1">
-                                    <i class="fa-solid fa-volume-high"></i> Écouter
-                                </button>
-                            </div>
-                        ` : ''}
-                    </div>
-                `;
+                    </div>`;
                 messagesContainer.appendChild(msgDiv);
             });
-
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
-        // Envoi des messages & Simulation de réponse
-        chatForm.onsubmit = (e) => {
+        function escapeHtml(text) {
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        // ENVOI À L'API VERCEL
+        chatForm.onsubmit = async (e) => {
             e.preventDefault();
             const text = userInput.value.trim();
-              if (!text) return;
+            if (!text && !selectedFileData) return;
 
             if (!currentChatId) createNewChat();
-
             const activeChat = chats.find(c => c.id === currentChatId);
-            
-            // Titre automatique au 1er message
+
             if (activeChat.messages.length === 0) {
-                activeChat.title = text.length > 25 ? text.substring(0, 25) + '...' : text;
+                activeChat.title = text ? text.slice(0, 25) + '...' : 'Fichier joint';
             }
 
-            // Ajout du message utilisateur
-            activeChat.messages.push({ role: 'user', content: text });
+            const userMsg = { role: 'user', content: text, file: selectedFileData };
+            activeChat.messages.push(userMsg);
+            
+            // Réinitialisation formulaire
             userInput.value = '';
             userInput.style.height = 'auto';
-            
+            const attachedFile = selectedFileData;
+            selectedFileData = null;
+            fileInput.value = '';
+            filePreviewContainer.classList.add('hidden');
+
             saveChats();
             renderSidebar();
             renderMessages();
 
-            // Simulation de la réponse du bot (à connecter à votre API local/backend)
-            setTimeout(() => {
-                const botResponse = `Reçu ! Vous êtes en mode **${modeSelect.value}** (Recherche Web: **${isWebSearchActive ? 'Activée' : 'Désactivée'}**).\n\nVoici un exemple de code :\n\`\`\`javascript\nconsole.log("Connecté avec succès à MUJOS-OCTOPUS2 !");\n\`\`\``;
-                activeChat.messages.push({ role: 'assistant', content: botResponse });
-                saveChats();
-                renderMessages();
-            }, 600);
+            // Indicateur de chargement
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'flex gap-3 mr-auto items-center text-xs text-slate-400';
+            loadingDiv.innerHTML = `<div class="w-8 h-8 rounded-full bg-slate-800 text-indigo-400 flex items-center justify-center">🐙</div> <i class="fa-solid fa-spinner fa-spin"></i> Traitement par l'IA...`;
+            messagesContainer.appendChild(loadingDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+            try {
+                // APPEL À L'API BACKEND VERCEL
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        messages: activeChat.messages,
+                        mode: modeSelect.value,
+                        webSearch: isWebSearchActive,
+                        file: attachedFile
+                    })
+                });
+
+                   const data = await response.json();
+                loadingDiv.remove();
+
+                if (response.ok && data.reply) {
+                    activeChat.messages.push({ role: 'bot', content: data.reply });
+                } else {
+                    activeChat.messages.push({ role: 'bot', content: `⚠️ Erreur API : ${data.error || 'Erreur inconnue'}` });
+                }
+            } catch (err) {
+                loadingDiv.remove();
+                activeChat.messages.push({ role: 'bot', content: '⚠️ Impossible de contacter le serveur backend /api/chat.' });
+            }
+
+            saveChats();
+            renderMessages();
         };
 
-        // Initialisation au chargement
-        if (chats.length === 0) {
-            createNewChat();
-        } else {
-            currentChatId = chats[0].id;
-            renderSidebar();
-            renderMessages();
-        }
+        // Initialisation
+        if (chats.length === 0) createNewChat();
+        else { currentChatId = chats[0].id; renderSidebar(); renderMessages(); }
     </script>
 </body>
 </html>
+  
