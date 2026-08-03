@@ -4,14 +4,42 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Octopus AI</title>
+  
+  <!-- Tailwind CSS & FontAwesome -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Parser Markdown & Coloration Syntaxique (Code) -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     body { font-family: 'Inter', sans-serif; }
-    .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+    
+    .custom-scrollbar::-webkit-scrollbar { width: 5px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
+
+    /* Rendu Markdown Style Gemini */
+    .markdown-body h1, .markdown-body h2, .markdown-body h3 { font-weight: 600; color: #f8fafc; margin-top: 1.2rem; margin-bottom: 0.6rem; }
+    .markdown-body h2 { font-size: 1.15rem; }
+    .markdown-body p { margin-bottom: 0.8rem; line-height: 1.6; }
+    .markdown-body p:last-child { margin-bottom: 0; }
+    .markdown-body ul { list-style-type: disc; padding-left: 1.25rem; margin-bottom: 0.8rem; }
+    .markdown-body ol { list-style-type: decimal; padding-left: 1.25rem; margin-bottom: 0.8rem; }
+    .markdown-body table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.85rem; }
+    .markdown-body th, .markdown-body td { border: 1px solid #334155; padding: 0.5rem 0.75rem; text-align: left; }
+    .markdown-body th { background-color: #1e293b; font-weight: 600; }
+    
+    /* Blocs de code style VS Code */
+    .markdown-body pre { background: #0f172a; border: 1px solid #1e293b; border-radius: 0.75rem; padding: 0.8rem; overflow-x: auto; margin: 0.8rem 0; }
+    .markdown-body code { font-family: monospace; font-size: 0.85em; }
+    .markdown-body :not(pre) > code { background: #1e293b; padding: 0.2rem 0.4rem; border-radius: 0.25rem; color: #818cf8; }
+    
+    /* Images générées (Pollinations / Dall-E) */
+    .markdown-body img { max-width: 100%; height: auto; border-radius: 0.75rem; margin: 0.8rem 0; border: 1px solid #334155; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.4); }
   </style>
 </head>
 <body class="bg-slate-950 text-slate-100 h-[100dvh] flex overflow-hidden">
@@ -19,63 +47,64 @@
   <!-- Overlay sombre Mobile -->
   <div id="sidebar-overlay" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-30 hidden md:hidden transition-opacity"></div>
 
-  <!-- Sidebar Coulissante -->
-  <aside id="sidebar" class="fixed md:static inset-y-0 left-0 w-72 bg-slate-900 border-r border-slate-800/80 flex flex-col justify-between z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out">
-    <div class="p-4 flex flex-col h-full overflow-hidden">
+  <!-- Sidebar Coulissante (Style Gemini) -->
+  <aside id="sidebar" class="fixed md:static inset-y-0 left-0 w-64 bg-slate-900/90 border-r border-slate-800/80 flex flex-col justify-between z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out">
+    <div class="p-3 flex flex-col h-full overflow-hidden">
       
-      <!-- Logo -->
-      <div class="flex items-center justify-between mb-4">
+      <!-- En-tête Sidebar -->
+      <div class="flex items-center justify-between mb-4 px-2">
         <div class="flex items-center gap-2.5">
-          <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-white shadow-lg text-lg">
-            🐙
-          </div>
-          <span class="font-bold text-lg tracking-wide text-white">Octopus AI</span>
+          <div class="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-white shadow-md text-base">🐙</div>
+          <span class="font-semibold text-base text-slate-100">Octopus AI</span>
         </div>
-        <button id="close-sidebar-btn" class="md:hidden text-slate-400 hover:text-white p-2">
+        <button id="close-sidebar-btn" class="md:hidden text-slate-400 hover:text-white p-1.5">
           <i class="fa-solid fa-xmark text-lg"></i>
         </button>
       </div>
 
       <!-- Bouton Nouvelle Discussion -->
-      <button id="new-chat-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs py-2.5 px-4 rounded-xl font-semibold transition flex items-center justify-center gap-2 shadow-md mb-4">
-        <i class="fa-solid fa-plus text-xs"></i> Nouvelle Discussion
+      <button id="new-chat-btn" class="w-full bg-slate-800 hover:bg-slate-700/80 text-slate-200 text-xs py-2.5 px-3 rounded-xl font-medium transition flex items-center gap-2.5 mb-4 border border-slate-700/50">
+        <i class="fa-solid fa-plus text-indigo-400"></i> Nouvelle discussion
       </button>
 
+      <!-- Titre Historique -->
+      <div class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-2 mb-2">Récents</div>
+
       <!-- Liste des discussions -->
-      <div class="flex-1 overflow-y-auto custom-scrollbar space-y-1.5 pr-1" id="chat-list"></div>
+      <div class="flex-1 overflow-y-auto custom-scrollbar space-y-1 pr-1" id="chat-list"></div>
 
       <!-- Footer Sidebar -->
-      <div class="pt-3 mt-auto border-t border-slate-800/80 text-xs text-slate-500 flex justify-between items-center">
-        <span>Octopus Engine v2.0</span>
-        <span class="text-indigo-400 font-semibold flex items-center gap-1">
-          <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Online
-        </span>
+      <div class="pt-3 mt-auto border-t border-slate-800/80 text-xs text-slate-400 flex flex-col gap-2">
+        <div class="flex items-center justify-between px-1">
+          <span class="text-[11px] text-slate-500">Octopus Engine v2.0</span>
+          <span class="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Online
+          </span>
+        </div>
       </div>
     </div>
   </aside>
 
-  <!-- Zone Principale -->
+  <!-- Zone Principale (Chat Centré Style Gemini) -->
   <main class="flex-1 flex flex-col h-full w-full bg-slate-950 relative overflow-hidden">
     
-    <!-- Header Chat -->
-    <header class="h-14 md:h-16 border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-md px-3 md:px-6 flex items-center justify-between z-20 shrink-0 gap-2">
-      <div class="flex items-center gap-2 shrink-0">
-        <button id="open-sidebar-btn" class="text-slate-300 hover:text-white p-2 rounded-xl bg-slate-800/80 border border-slate-700/50 hover:bg-slate-800 transition">
-          <i class="fa-solid fa-bars text-sm"></i>
+    <!-- Header principal -->
+    <header class="h-14 border-b border-slate-800/60 bg-slate-950/80 backdrop-blur-md px-4 flex items-center justify-between z-20 shrink-0">
+      <div class="flex items-center gap-3">
+        <button id="open-sidebar-btn" class="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800/60 transition">
+          <i class="fa-solid fa-bars text-base"></i>
         </button>
+        <h1 class="font-medium text-slate-200 text-sm truncate max-w-[150px] sm:max-w-xs" id="current-chat-title">Nouvelle discussion</h1>
       </div>
 
-      <h1 class="hidden sm:block font-semibold text-slate-200 text-xs md:text-sm truncate max-w-[120px] md:max-w-md" id="current-chat-title">
-        Nouvelle Discussion
-      </h1>
-
-      <div class="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto">
-        <button id="web-search-toggle" class="bg-slate-900 border border-slate-800 text-slate-300 text-[11px] md:text-xs px-2.5 py-1.5 rounded-xl font-medium flex items-center gap-1 transition">
-          <span>🌐</span>
+      <!-- Commandes à droite -->
+      <div class="flex items-center gap-2">
+        <button id="web-search-toggle" class="bg-slate-900 border border-slate-800 text-slate-300 text-xs px-2.5 py-1.5 rounded-xl font-medium flex items-center gap-1.5 transition hover:border-slate-700">
+          <i class="fa-solid fa-globe text-indigo-400"></i>
           <span id="web-status" class="text-red-400 font-bold">OFF</span>
         </button>
 
-        <select id="mode-select" class="bg-slate-900 border border-slate-800 text-slate-300 text-[11px] md:text-xs rounded-xl px-2 py-1.5 focus:outline-none focus:border-indigo-500 font-medium">
+        <select id="mode-select" class="bg-slate-900 border border-slate-800 text-slate-300 text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 font-medium">
           <option value="general">🤖 Général</option>
           <option value="code">💻 Code</option>
           <option value="writing">📝 Rédaction</option>
@@ -83,21 +112,50 @@
       </div>
     </header>
 
-    <!-- Zone des messages -->
-    <div id="messages-container" class="flex-1 overflow-y-auto custom-scrollbar p-3 md:p-6 space-y-4 md:space-y-6 pb-4"></div>
+    <!-- Content / Messages (Centré max-w-3xl comme Gemini) -->
+    <div id="messages-container" class="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 space-y-6 max-w-3xl w-full mx-auto"></div>
 
-    <!-- Zone de Saisie -->
-    <div class="p-2.5 md:p-4 bg-slate-950 border-t border-slate-800/80 shrink-0">
-      <form id="chat-form" class="max-w-4xl mx-auto relative flex items-center">
-        <textarea id="user-input" rows="1" placeholder="Écris ton message..." class="w-full bg-slate-900 text-slate-100 placeholder-slate-500 text-xs md:text-sm rounded-xl pl-3.5 pr-11 py-3 border border-slate-800 focus:outline-none focus:border-indigo-500 resize-none max-h-28 shadow-lg transition custom-scrollbar"></textarea>
-        <button type="submit" id="send-btn" class="absolute right-2 p-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition shadow-md flex items-center justify-center w-7 h-7 md:w-8 md:h-8">
-          <i class="fa-solid fa-paper-plane text-xs"></i>
-        </button>
-      </form>
+    <!-- Barre de Saisie Flottante (Style Gemini) -->
+    <div class="p-3 sm:p-4 bg-gradient-to-t from-slate-950 via-slate-950 to-transparent shrink-0">
+      <div class="max-w-3xl mx-auto relative">
+        <form id="chat-form" class="bg-slate-900/90 border border-slate-800 rounded-2xl p-2 sm:p-3 shadow-xl focus-within:border-slate-700 transition">
+          <textarea id="user-input" rows="1" placeholder="Posez une question ou demandez une image..." class="w-full bg-transparent text-slate-100 placeholder-slate-500 text-sm focus:outline-none resize-none max-h-32 px-2 py-1 custom-scrollbar"></textarea>
+          
+          <div class="flex items-center justify-between pt-2 border-t border-slate-800/60 mt-2">
+            <!-- Outillage à gauche (Fichiers, Micro) -->
+            <div class="flex items-center gap-1 text-slate-400">
+              <label class="p-1.5 hover:bg-slate-800 hover:text-slate-200 rounded-lg cursor-pointer transition text-xs flex items-center justify-center">
+                <i class="fa-solid fa-paperclip"></i>
+                <input type="file" id="file-input" class="hidden" accept="image/*,.pdf,.txt">
+              </label>
+              <button type="button" id="mic-btn" class="p-1.5 hover:bg-slate-800 hover:text-slate-200 rounded-lg transition text-xs">
+                <i class="fa-solid fa-microphone"></i>
+              </button>
+            </div>
+
+            <!-- Bouton d'envoi -->
+            <button type="submit" id="send-btn" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-3 py-1.5 transition text-xs font-medium flex items-center gap-1.5 shadow-md">
+              <span>Envoyer</span>
+              <i class="fa-solid fa-paper-plane text-[10px]"></i>
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   </main>
 
   <script>
+    // Config Parser Markdown
+    marked.setOptions({
+      highlight: function(code, lang) {
+        if (lang && hljs.getLanguage(lang)) {
+          return hljs.highlight(code, { language: lang }).value;
+        }
+        return hljs.highlightAuto(code).value;
+      },
+      breaks: true
+    });
+
     let chats = JSON.parse(localStorage.getItem('octopus_chats')) || [];
     let currentChatId = null;
     let isWebSearchActive = false;
@@ -115,6 +173,35 @@
     const webStatus = document.getElementById('web-status');
     const newChatBtn = document.getElementById('new-chat-btn');
     const currentChatTitle = document.getElementById('current-chat-title');
+    const micBtn = document.getElementById('mic-btn');
+
+    // Textarea Auto-resize
+    userInput.addEventListener('input', function() {
+      this.style.height = 'auto';
+      this.style.height = (this.scrollHeight) + 'px';
+    });
+
+    // Reconnaissance vocale (Microphone)
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'fr-FR';
+
+      micBtn.onclick = () => {
+        recognition.start();
+        micBtn.classList.add('text-red-400');
+      };
+
+      recognition.onresult = (e) => {
+        userInput.value += e.results[0][0].transcript;
+        micBtn.classList.remove('text-red-400');
+        userInput.style.height = (userInput.scrollHeight) + 'px';
+      };
+
+      recognition.onerror = recognition.onend = () => micBtn.classList.remove('text-red-400');
+    } else {
+      micBtn.style.display = 'none';
+    }
 
     function openSidebar() {
       sidebar.classList.remove('-translate-x-full');
@@ -126,32 +213,20 @@
       sidebarOverlay.classList.add('hidden');
     }
 
-    openSidebarBtn.onclick = () => {
-      if (sidebar.classList.contains('-translate-x-full')) openSidebar();
-      else closeSidebar();
-    };
-
+    openSidebarBtn.onclick = () => sidebar.classList.contains('-translate-x-full') ? openSidebar() : closeSidebar();
     closeSidebarBtn.onclick = closeSidebar;
     sidebarOverlay.onclick = closeSidebar;
 
     webToggle.onclick = () => {
       isWebSearchActive = !isWebSearchActive;
       webStatus.textContent = isWebSearchActive ? 'ON' : 'OFF';
-      webStatus.className = isWebSearchActive ? 'text-green-400 font-bold' : 'text-red-400';
-      webToggle.classList.toggle('border-indigo-500', isWebSearchActive);
-      webToggle.classList.toggle('bg-slate-800', isWebSearchActive);
+      webStatus.className = isWebSearchActive ? 'text-emerald-400 font-bold' : 'text-red-400';
     };
 
-    function saveChats() {
-      localStorage.setItem('octopus_chats', JSON.stringify(chats));
-    }
+    function saveChats() { localStorage.setItem('octopus_chats', JSON.stringify(chats)); }
 
     function createNewChat() {
-      const newChat = {
-        id: Date.now().toString(),
-        title: 'Nouvelle Discussion',
-        messages: []
-      };
+      const newChat = { id: Date.now().toString(), title: 'Nouvelle discussion', messages: [] };
       chats.unshift(newChat);
       currentChatId = newChat.id;
       saveChats();
@@ -165,17 +240,15 @@
       chats.forEach(chat => {
         const btn = document.createElement('div');
         const isActive = chat.id === currentChatId;
-        btn.className = `p-2.5 rounded-xl text-xs font-medium cursor-pointer flex items-center justify-between group transition ${isActive ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'}`;
-        
+        btn.className = `p-2 rounded-xl text-xs font-medium cursor-pointer flex items-center justify-between group transition ${isActive ? 'bg-indigo-600/10 text-indigo-400' : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'}`;
         btn.innerHTML = `
           <div class="flex items-center gap-2 truncate">
             <i class="fa-regular fa-message text-slate-500"></i>
             <span class="truncate">${chat.title}</span>
           </div>
-          <button onclick="deleteChat(event, '${chat.id}')" class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition p-1">
+          <button onclick="deleteChat(event, '${chat.id}')" class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 p-1 transition">
             <i class="fa-solid fa-trash"></i>
-          </button>
-        `;
+          </button>`;
         btn.onclick = (e) => {
           if (!e.target.closest('button')) {
             currentChatId = chat.id;
@@ -191,31 +264,24 @@
     function deleteChat(e, id) {
       e.stopPropagation();
       chats = chats.filter(c => c.id !== id);
-      if (currentChatId === id) {
-        currentChatId = chats.length > 0 ? chats[0].id : null;
-      }
+      currentChatId = chats.length > 0 ? chats[0].id : null;
       saveChats();
       if (!currentChatId) createNewChat();
-      else {
-        renderSidebar();
-        renderMessages();
-      }
+      else { renderSidebar(); renderMessages(); }
     }
 
     function renderMessages() {
       const current = chats.find(c => c.id === currentChatId);
       if (!current) return;
-
       if (currentChatTitle) currentChatTitle.textContent = current.title;
 
       if (current.messages.length === 0) {
         messagesContainer.innerHTML = `
-          <div class="h-full flex flex-col items-center justify-center text-center text-slate-500 my-auto px-4">
-            <div class="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-2xl md:text-3xl mb-3 shadow-inner">🐙</div>
-            <h2 class="text-base md:text-lg font-semibold text-slate-300 mb-1">Comment puis-je t'aider ?</h2>
-            <p class="text-xs max-w-xs text-slate-500">Pose une question, demande du code, ou active la recherche Web 🌐 pour des infos en direct.</p>
-          </div>
-        `;
+          <div class="h-full flex flex-col items-center justify-center text-center text-slate-500 my-auto py-12">
+            <div class="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-2xl mb-4 text-indigo-400">🐙</div>
+            <h2 class="text-xl font-semibold text-slate-200 mb-2">Bonjour ! Comment puis-je vous aider ?</h2>
+            <p class="text-xs max-w-sm text-slate-400 leading-relaxed">Posez vos questions, générez du code ou créez des visuels en toute simplicité.</p>
+          </div>`;
         return;
       }
 
@@ -223,13 +289,15 @@
       current.messages.forEach(m => {
         const isUser = m.role === 'user';
         const msgDiv = document.createElement('div');
-        msgDiv.className = `flex gap-2.5 max-w-full md:max-w-3xl ${isUser ? 'ml-auto flex-row-reverse' : 'mr-auto'}`;
+        msgDiv.className = `flex gap-3 sm:gap-4 ${isUser ? 'justify-end' : 'justify-start'}`;
         
+        let contentHtml = isUser 
+          ? `<div class="bg-indigo-600 text-white p-3.5 rounded-2xl text-xs sm:text-sm max-w-[85%] whitespace-pre-wrap">${escapeHtml(m.content)}</div>`
+          : `<div class="flex-1 bg-transparent text-slate-200 text-xs sm:text-sm markdown-body overflow-hidden">${marked.parse(m.content)}</div>`;
+
         msgDiv.innerHTML = `
-          <div class="w-7 h-7 md:w-8 md:h-8 rounded-xl flex items-center justify-center shrink-0 text-[10px] md:text-xs font-bold ${isUser ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-indigo-400 border border-slate-700'}">
-            ${isUser ? 'Vous' : '🐙'}
-          </div>
-          <div class="p-3 rounded-2xl text-xs md:text-sm leading-relaxed ${isUser ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-slate-900 text-slate-200 border border-slate-800 rounded-tl-none'} shadow-sm whitespace-pre-wrap break-words">${escapeHtml(m.content)}</div>
+          ${!isUser ? `<div class="w-7 h-7 rounded-lg bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center text-xs shrink-0 font-bold">🐙</div>` : ''}
+          ${contentHtml}
         `;
         messagesContainer.appendChild(msgDiv);
       });
@@ -237,9 +305,7 @@
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 
-    function escapeHtml(text) {
-      return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    }
+    function escapeHtml(text) { return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 
     chatForm.onsubmit = async (e) => {
       e.preventDefault();
@@ -250,23 +316,23 @@
       const current = chats.find(c => c.id === currentChatId);
 
       if (current.messages.length === 0) {
-        current.title = content.slice(0, 20) + (content.length > 20 ? '...' : '');
+        current.title = content.slice(0, 25) + (content.length > 25 ? '...' : '');
       }
 
       current.messages.push({ role: 'user', content });
       userInput.value = '';
+      userInput.style.height = 'auto';
       saveChats();
       renderSidebar();
       renderMessages();
 
       const loadingDiv = document.createElement('div');
-      loadingDiv.className = 'flex gap-2.5 max-w-full md:max-w-3xl mr-auto';
+      loadingDiv.className = 'flex gap-3 justify-start';
       loadingDiv.innerHTML = `
-        <div class="w-7 h-7 md:w-8 md:h-8 rounded-xl bg-slate-800 text-indigo-400 border border-slate-700 flex items-center justify-center shrink-0 text-[10px] font-bold">🐙</div>
-        <div class="p-3 rounded-2xl bg-slate-900 text-slate-400 text-xs border border-slate-800 flex items-center gap-2">
-          <i class="fa-solid fa-spinner fa-spin"></i> ${isWebSearchActive ? 'Recherche Tavily...' : 'Réflexion...'}
-        </div>
-      `;
+        <div class="w-7 h-7 rounded-lg bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center text-xs shrink-0 font-bold">🐙</div>
+        <div class="text-xs text-slate-400 flex items-center gap-2 pt-1.5">
+          <i class="fa-solid fa-spinner fa-spin text-indigo-400"></i> Traitement en cours...
+        </div>`;
       messagesContainer.appendChild(loadingDiv);
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
@@ -274,11 +340,7 @@
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messages: current.messages,
-            mode: modeSelect.value,
-            webSearch: isWebSearchActive
-          })
+          body: JSON.stringify({ messages: current.messages, mode: modeSelect.value, webSearch: isWebSearchActive })
         });
 
         const data = await res.json();
@@ -287,11 +349,11 @@
         if (res.ok && data.reply) {
           current.messages.push({ role: 'bot', content: data.reply });
         } else {
-          current.messages.push({ role: 'bot', content: `⚠️ Erreur : ${data.error || 'Erreur de réponse'}` });
+          current.messages.push({ role: 'bot', content: `⚠️ Erreur : ${data.error || 'Impossible de répondre'}` });
         }
       } catch (err) {
         loadingDiv.remove();
-        current.messages.push({ role: 'bot', content: '⚠️ Erreur de connexion.' });
+        current.messages.push({ role: 'bot', content: '⚠️ Connexion interrompue.' });
       }
 
       saveChats();
@@ -301,12 +363,7 @@
     newChatBtn.onclick = createNewChat;
 
     if (chats.length === 0) createNewChat();
-    else {
-      currentChatId = chats[0].id;
-      renderSidebar();
-      renderMessages();
-    }
+    else { currentChatId = chats[0].id; renderSidebar(); renderMessages(); }
   </script>
 </body>
-          </html>
-  
+</html>
