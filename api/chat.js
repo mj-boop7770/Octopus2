@@ -1,4 +1,4 @@
-// api/chat.js - Entrypoint Vercel adapté à ton dossier api/lib/
+// api/chat.js - Entrypoint principal Octopus2
 const { planRequest } = require('./lib/planner.js');
 const { runSpecializedAgent } = require('./lib/specializedAgents.js');
 
@@ -62,7 +62,7 @@ module.exports = async function handler(req, res) {
       } catch (e) {}
     }
 
-    // 1. Détermination du plan via Planner (dans api/lib/)
+    // 1. Détermination du plan via Planner
     const plan = await planRequest(lastUserMsg, historySummary, Boolean(hasImage), keys.groq);
 
     // 2. Traitement des outils
@@ -82,7 +82,7 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // 3. Exécution via l'agent spécialisé (dans api/lib/)
+    // 3. Exécution via l'agent spécialisé
     const agentResult = await runSpecializedAgent({
       plan,
       messages,
@@ -90,12 +90,21 @@ module.exports = async function handler(req, res) {
       keys
     });
 
+    // Insertion des métadonnées réelles générées par le serveur Node.js
+    const realSystemInfo = `[SYSTEM_INFO]
+- Agent actif : ${plan.agent}
+- Modèle utilisé : ${agentResult.usedModel.modelName} (${agentResult.usedModel.provider})
+- Projet détecté : ${plan.activeProject}
+[/SYSTEM_INFO]\n\n`;
+
+    const finalResponse = realSystemInfo + agentResult.response;
+
     if (sessionId && saveChatMessage) {
-      saveChatMessage(sessionId, lastUserMsg, agentResult.response).catch(() => {});
+      saveChatMessage(sessionId, lastUserMsg, finalResponse).catch(() => {});
     }
 
     return res.status(200).json({
-      reply: agentResult.response,
+      reply: finalResponse,
       meta: {
         agentUsed: plan.agent,
         activeProject: plan.activeProject,
@@ -113,4 +122,4 @@ module.exports = async function handler(req, res) {
     });
   }
 };
-      
+                            
