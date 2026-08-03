@@ -90,7 +90,7 @@ module.exports = async function handler(req, res) {
       keys
     });
 
-    // Insertion des métadonnées réelles générées par le serveur Node.js
+    // En-tête officiel Vercel (Données réelles du système)
     const realSystemInfo = `[SYSTEM_INFO]
 - Agent actif : ${plan.agent}
 - Modèle utilisé : ${agentResult.usedModel.modelName} (${agentResult.usedModel.provider})
@@ -122,4 +122,4 @@ module.exports = async function handler(req, res) {
     });
   }
 };
-                            
+         
