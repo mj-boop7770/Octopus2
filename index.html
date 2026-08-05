@@ -79,10 +79,10 @@
             <div class="flex items-center gap-3">
                 <select id="mode-select" class="bg-slate-900 border border-slate-800 text-slate-300 text-xs rounded-xl px-3 py-1.5 outline-none focus:border-indigo-500/50 transition cursor-pointer">
                     <option value="standard">💬 Standard</option>
-                    <option value="music-maestro">🎵 Maestro Audio</option>
                     <option value="creative">🎨 Créatif</option>
                     <option value="code">💻 Code</option>
                     <option value="concise">📌 Précis</option>
+                    <option value="music">🎵 Musique (Audio)</option>
                 </select>
                 <button id="web-search-toggle" class="flex items-center gap-1.5 bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 rounded-xl px-3 py-1.5 text-xs transition active:scale-95">
                     <i class="fa-solid fa-globe"></i>
@@ -91,24 +91,24 @@
             </div>
         </header>
 
-        <!-- MESSAGES CONTAINER -->
+        <!-- MESSAGES -->
         <div id="messages-container" class="flex-1 overflow-y-auto custom-scrollbar px-4 sm:px-8 py-6 space-y-5"></div>
 
-        <!-- INDICATEUR PRÉVISUALISATION FICHIER -->
-        <div id="file-preview-container" class="hidden px-4 sm:px-8 py-2 bg-slate-900/60 border-t border-slate-800/40 flex items-center gap-3">
-            <div id="file-preview-content" class="text-xs text-indigo-300 bg-slate-800 px-3 py-1.5 rounded-lg flex items-center gap-2 border border-indigo-500/30"></div>
-            <button id="remove-file-btn" type="button" class="text-slate-500 hover:text-red-400 text-xs"><i class="fa-solid fa-xmark"></i></button>
+        <!-- PRÉVISUALISATION FICHIER JOINT -->
+        <div id="file-preview-container" class="hidden px-4 sm:px-8 py-2 bg-slate-900/40 border-t border-slate-800/40 flex items-center gap-3">
+            <div id="file-preview-content" class="text-xs text-slate-300 bg-slate-800 px-3 py-1.5 rounded-lg flex items-center gap-2"></div>
+            <button id="remove-file-btn" class="text-slate-500 hover:text-red-400 text-xs"><i class="fa-solid fa-xmark"></i></button>
         </div>
 
         <!-- ZONE DE SAISIE -->
         <div class="border-t border-slate-800/50 bg-[#0f0f13] px-4 sm:px-8 py-4">
             <form id="chat-form" class="max-w-4xl mx-auto flex items-end gap-2 bg-slate-900/70 border border-slate-800/60 rounded-2xl p-1.5 shadow-lg focus-within:border-indigo-500/50 transition">
                 
-                <!-- BOUTON FICHIERS & PHOTOS -->
-                <label for="file-input" class="text-slate-500 hover:text-indigo-400 transition p-2 text-sm cursor-pointer active:scale-95 flex items-center justify-center" title="Joindre une photo, du code ou un document">
+                <!-- BOUTON PIÈCE JOINTE -->
+                <label for="file-input" class="text-slate-500 hover:text-indigo-400 transition p-2 text-sm cursor-pointer active:scale-95 flex items-center justify-center" title="Joindre une image ou un fichier">
                     <i class="fa-solid fa-paperclip"></i>
                 </label>
-                <input type="file" id="file-input" class="hidden" accept="image/*, .txt, .js, .py, .json, .html, .css, .md, text/*">
+                <input type="file" id="file-input" class="hidden" accept="image/*, application/pdf, text/plain, text/javascript, text/css, text/html, application/json">
 
                 <!-- BOUTON MICRO -->
                 <button id="mic-btn" type="button" class="text-slate-500 hover:text-indigo-400 transition p-2 text-sm active:scale-95" title="Dictée vocale">
@@ -123,13 +123,374 @@
                 </button>
             </form>
             <p class="text-center text-[10px] text-slate-500 mt-2.5 tracking-wide">
-                ⚡ Connecté au serveur Vercel · Studio Audio & Code · <span class="text-indigo-400">🐙 MUJOS-OCTOPUS2</span>
+                ⚡ Connecté au serveur Vercel · Code & Vision · <span class="text-indigo-400">🐙 MUJOS-OCTOPUS2</span>
             </p>
         </div>
     </main>
 
-    <!-- DELEGATION DU CODE LOGIQUE VERS LE FICHIER EXTERNE APP.JS -->
-    <script src="js/app.js"></script>
+    <!-- LOGIQUE JAVASCRIPT AMÉLIORÉE -->
+    <script>
+        // Config Markdown & Syntax Highlighting
+        const renderer = new marked.Renderer();
+        renderer.code = function(code, language) {
+            const validLang = language && hljs.getLanguage(language) ? language : 'plaintext';
+            const highlighted = hljs.highlight(code, { language: validLang }).value;
+            const codeId = 'code-' + Math.random().toString(36).substr(2, 9);
+
+            return `
+                <div class="relative group my-4 rounded-xl overflow-hidden border border-slate-800 bg-slate-900 shadow-lg">
+                    <div class="flex items-center justify-between px-4 py-2 bg-slate-800 text-[11px] text-slate-400 font-mono border-b border-slate-700/50">
+                        <span class="uppercase">${validLang}</span>
+                        <button onclick="copyCode('${codeId}', this)" class="hover:text-white transition flex items-center gap-1.5">
+                            <i class="fa-regular fa-copy"></i> <span class="copy-text">Copier</span>
+                        </button>
+                    </div>
+                    <pre class="p-4 overflow-x-auto custom-scrollbar text-xs font-mono"><code id="${codeId}" class="hljs language-${validLang}">${highlighted}</code></pre>
+                </div>`;
+        };
+        marked.setOptions({ renderer: renderer, breaks: true, gfm: true });
+
+        // Utilitaires de copie et lecture vocale
+        window.copyCode = function(id, btn) {
+            const codeElement = document.getElementById(id);
+            if (!codeElement) return;
+            navigator.clipboard.writeText(codeElement.innerText).then(() => {
+                const span = btn.querySelector('.copy-text');
+                if (span) span.innerText = 'Copié !';
+                setTimeout(() => { if (span) span.innerText = 'Copier'; }, 2000);
+            });
+        };
+
+        window.speakText = function(btn) {
+            if ('speechSynthesis' in window) {
+                const container = btn.closest('.markdown-body');
+                if (!container) return;
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(container.innerText);
+                utterance.lang = 'fr-FR';
+                window.speechSynthesis.speak(utterance);
+            }
+        };
+
+        // État Global
+        let chats = JSON.parse(localStorage.getItem('octopus_chats')) || [];
+        let currentChatId = null;
+        let isWebSearchActive = false;
+        let selectedFileData = null;
+
+        // Éléments DOM
+        const sidebar = document.getElementById('sidebar');
+        const sidebarOverlay = document.getElementById('sidebar-overlay');
+        const openSidebarBtn = document.getElementById('open-sidebar-btn');
+        const closeSidebarBtn = document.getElementById('close-sidebar-btn');
+        const chatListEl = document.getElementById('chat-list');
+        const messagesContainer = document.getElementById('messages-container');
+        const chatForm = document.getElementById('chat-form');
+        const userInput = document.getElementById('user-input');
+        const modeSelect = document.getElementById('mode-select');
+        const webToggle = document.getElementById('web-search-toggle');
+        const webStatus = document.getElementById('web-status');
+        const newChatBtn = document.getElementById('new-chat-btn');
+        const currentChatTitle = document.getElementById('current-chat-title');
+        const micBtn = document.getElementById('mic-btn');
+        const fileInput = document.getElementById('file-input');
+        const filePreviewContainer = document.getElementById('file-preview-container');
+        const filePreviewContent = document.getElementById('file-preview-content');
+        const removeFileBtn = document.getElementById('remove-file-btn');
+
+        // Dictée vocale
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'fr-FR';
+            recognition.continuous = false;
+
+            micBtn.onclick = () => {
+                micBtn.classList.add('text-red-500', 'animate-pulse');
+                recognition.start();
+            };
+
+            recognition.onresult = (e) => {
+                userInput.value += (userInput.value ? ' ' : '') + e.results[0][0].transcript;
+                userInput.dispatchEvent(new Event('input'));
+                micBtn.classList.remove('text-red-500', 'animate-pulse');
+            };
+
+            recognition.onerror = recognition.onend = () => {
+                micBtn.classList.remove('text-red-500', 'animate-pulse');
+            };
+        }
+
+        // GESTION CORRIGÉE DE L'IMPORTATION DE FICHIERS (TEXTE, PHOTOS, DOCUMENTS)
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const isTextFile = file.type.startsWith('text/') || 
+                               file.name.endsWith('.txt') || 
+                               file.name.endsWith('.js') || 
+                               file.name.endsWith('.json') || 
+                               file.name.endsWith('.html') || 
+                               file.name.endsWith('.css') || 
+                               file.name.endsWith('.md');
+
+            if (isTextFile) {
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    selectedFileData = {
+                        name: file.name,
+                        type: 'text/plain',
+                        text: evt.target.result,
+                        data: 'data:text/plain;base64,' + btoa(unescape(encodeURIComponent(evt.target.result)))
+                    };
+                    filePreviewContent.innerHTML = `<i class="fa-solid fa-file-lines text-indigo-400"></i> <span class="truncate max-w-xs">${file.name} (${Math.round(file.size/1024)} KB)</span>`;
+                    filePreviewContainer.classList.remove('hidden');
+                };
+                reader.readAsText(file);
+            } else {
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    selectedFileData = {
+                        name: file.name,
+                        type: file.type || 'application/octet-stream',
+                        data: evt.target.result
+                    };
+                    const iconClass = file.type.startsWith('image/') ? 'fa-image' : 'fa-file';
+                    filePreviewContent.innerHTML = `<i class="fa-solid ${iconClass} text-indigo-400"></i> <span class="truncate max-w-xs">${file.name}</span>`;
+                    filePreviewContainer.classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        removeFileBtn.onclick = () => {
+            selectedFileData = null;
+            fileInput.value = '';
+            filePreviewContainer.classList.add('hidden');
+        };
+
+        // Redimensionnement du textarea
+        userInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 128) + 'px';
+        });
+
+        // Contrôle Sidebar & Web Search
+        openSidebarBtn.onclick = () => { sidebar.classList.remove('-translate-x-full'); sidebarOverlay.classList.remove('hidden'); };
+        closeSidebarBtn.onclick = () => { sidebar.classList.add('-translate-x-full'); sidebarOverlay.classList.add('hidden'); };
+        sidebarOverlay.onclick = closeSidebarBtn.onclick;
+
+        webToggle.onclick = () => {
+            isWebSearchActive = !isWebSearchActive;
+            webStatus.textContent = isWebSearchActive ? 'ON' : 'OFF';
+            webStatus.className = isWebSearchActive ? 'text-emerald-400 font-bold' : 'text-red-400';
+        };
+
+        // Gestion des chats
+        function saveChats() { localStorage.setItem('octopus_chats', JSON.stringify(chats)); }
+
+        function createNewChat() {
+            const newChat = { id: Date.now().toString(), title: 'Nouvelle discussion', messages: [] };
+            chats.unshift(newChat);
+            currentChatId = newChat.id;
+            saveChats();
+            renderSidebar();
+            renderMessages();
+        }
+
+        function renderSidebar() {
+            chatListEl.innerHTML = '';
+            chats.forEach(chat => {
+                const btn = document.createElement('div');
+                const isActive = chat.id === currentChatId;
+                btn.className = `p-2 rounded-xl text-xs font-medium cursor-pointer flex items-center justify-between transition ${isActive ? 'bg-indigo-600/10 text-indigo-400' : 'text-slate-400 hover:bg-slate-800/50'}`;
+                btn.innerHTML = `
+                    <div class="flex items-center gap-2 truncate">
+                        <i class="fa-regular fa-message text-slate-500"></i>
+                        <span class="truncate">${chat.title}</span>
+                    </div>
+                    <button onclick="deleteChat(event, '${chat.id}')" class="text-slate-500 hover:text-red-400 p-1"><i class="fa-solid fa-trash"></i></button>`;
+                btn.onclick = (e) => {
+                    if (!e.target.closest('button')) {
+                        currentChatId = chat.id;
+                        renderSidebar();
+                        renderMessages();
+                    }
+                };
+                chatListEl.appendChild(btn);
+            });
+        }
+
+        window.deleteChat = function(e, id) {
+            e.stopPropagation();
+            chats = chats.filter(c => c.id !== id);
+            currentChatId = chats.length > 0 ? chats[0].id : null;
+            saveChats();
+            if (!currentChatId) createNewChat(); else { renderSidebar(); renderMessages(); }
+        };
+
+        newChatBtn.onclick = createNewChat;
+
+        function renderMessages() {
+            messagesContainer.innerHTML = '';
+            const activeChat = chats.find(c => c.id === currentChatId);
+            if (!activeChat) return;
+
+            currentChatTitle.textContent = activeChat.title;
+
+            activeChat.messages.forEach(msg => {
+                const isUser = msg.role === 'user';
+                const msgDiv = document.createElement('div');
+                msgDiv.className = `flex gap-3 max-w-3xl ${isUser ? 'ml-auto flex-row-reverse' : 'mr-auto'}`;
+                
+                let fileHtml = '';
+                if (msg.file) {
+                    if (msg.file.type && msg.file.type.startsWith('image/')) {
+                        fileHtml = `<img src="${msg.file.data}" class="max-w-xs rounded-lg my-2 border border-slate-700 shadow" />`;
+                    } else if (msg.file.text) {
+                        fileHtml = `<div class="text-xs bg-slate-800/80 border border-slate-700 p-2.5 rounded-lg my-1 font-mono text-slate-300 max-h-32 overflow-y-auto custom-scrollbar"><i class="fa-solid fa-file-lines text-indigo-400"></i> <b>${msg.file.name}</b><br><pre class="whitespace-pre-wrap mt-1 text-[11px] text-slate-400">${escapeHtml(msg.file.text.slice(0, 300))}${msg.file.text.length > 300 ? '...' : ''}</pre></div>`;
+                    } else {
+                        fileHtml = `<div class="text-xs bg-slate-800 p-2 rounded my-1"><i class="fa-solid fa-paperclip"></i> ${msg.file.name}</div>`;
+                    }
+                }
+
+                if (msg.isAudio && msg.audioUrl) {
+                      msgDiv.innerHTML = `
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs bg-slate-800 text-indigo-400 border border-slate-700">🐙</div>
+                        <div class="space-y-1.5 max-w-[85%]">
+                            <div class="p-4 bg-slate-900 border border-indigo-500/40 rounded-2xl max-w-md shadow-xl space-y-3 text-white">
+                                <div class="flex items-center justify-between text-xs font-semibold text-indigo-400 border-b border-slate-800 pb-2">
+                                    <span class="flex items-center gap-1.5">🎵 <span>Maestro Audio Studio</span></span>
+                                    <span class="text-slate-400 text-[10px]">WAV • HD</span>
+                                </div>
+                                <audio controls class="w-full mt-2 rounded-lg bg-slate-950">
+                                    <source src="${msg.audioUrl}" type="audio/wav">
+                                </audio>
+                                <div class="flex items-center justify-end pt-1">
+                                    <a href="${msg.audioUrl}" download="octopus-music.wav" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white transition-colors shadow">
+                                        📥 Télécharger (.wav)
+                                    </a>
+                                </div>
+                            </div>
+                        </div>`;
+                } else {
+                    msgDiv.innerHTML = `
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs ${isUser ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-indigo-400 border border-slate-700'}">
+                            ${isUser ? '<i class="fa-solid fa-user"></i>' : '🐙'}
+                        </div>
+                        <div class="space-y-1.5 max-w-[85%]">
+                            <div class="p-3.5 rounded-2xl ${isUser ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-slate-900 border border-slate-800 text-slate-200 rounded-tl-none'} shadow-sm">
+                                ${fileHtml}
+                                <div class="markdown-body">${isUser ? escapeHtml(msg.content) : marked.parse(msg.content)}</div>
+                            </div>
+                        </div>`;
+                }
+                messagesContainer.appendChild(msgDiv);
+            });
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        // ENVOI À L'API
+        chatForm.onsubmit = async (e) => {
+            e.preventDefault();
+            const rawText = userInput.value.trim();
+            if (!rawText && !selectedFileData) return;
+
+            if (!currentChatId) createNewChat();
+            const activeChat = chats.find(c => c.id === currentChatId);
+
+            if (activeChat.messages.length === 0) {
+                activeChat.title = rawText ? rawText.slice(0, 25) + '...' : (selectedFileData ? selectedFileData.name : 'Fichier joint');
+            }
+
+            let fullTextPrompt = rawText;
+            if (selectedFileData && selectedFileData.text) {
+                fullTextPrompt += `\n\n[CONTENU DU FICHIER "${selectedFileData.name}"]:\n${selectedFileData.text}`;
+            }
+
+            const userMsg = { role: 'user', content: rawText || `[Fichier : ${selectedFileData.name}]`, file: selectedFileData };
+            activeChat.messages.push(userMsg);
+            
+            userInput.value = '';
+            userInput.style.height = 'auto';
+            const attachedFile = selectedFileData;
+            selectedFileData = null;
+            fileInput.value = '';
+            filePreviewContainer.classList.add('hidden');
+
+            saveChats();
+            renderSidebar();
+            renderMessages();
+
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'flex gap-3 mr-auto items-center text-xs text-slate-400';
+            loadingDiv.innerHTML = `<div class="w-8 h-8 rounded-full bg-slate-800 text-indigo-400 flex items-center justify-center">🐙</div> <i class="fa-solid fa-spinner fa-spin"></i> Traitement par l'IA...`;
+            messagesContainer.appendChild(loadingDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+            const isAudioMode = modeSelect.value === 'music';
+
+            try {
+                if (isAudioMode) {
+                    const musicRes = await fetch('/api/music', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: fullTextPrompt || "Musique agréable" })
+                    });
+
+                    loadingDiv.remove();
+
+                    if (musicRes.ok) {
+                        const blob = await musicRes.blob();
+                        const audioUrl = URL.createObjectURL(blob);
+                        activeChat.messages.push({ role: 'bot', content: 'Génération musicale terminée.', isAudio: true, audioUrl: audioUrl });
+                    } else {
+                        const errText = await musicRes.text();
+                        activeChat.messages.push({ role: 'bot', content: `⚠️ Erreur Musique: ${errText || 'Impossible de générer le morceau.'}` });
+                    }
+                } else {
+                    const cleanMessagesHistory = activeChat.messages.map(m => ({
+                        role: m.role === 'bot' ? 'assistant' : 'user',
+                        content: m.content
+                    }));
+
+                    const response = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            message: fullTextPrompt,
+                            messages: cleanMessagesHistory,
+                            mode: modeSelect.value,
+                            webSearch: isWebSearchActive,
+                            file: attachedFile ? { name: attachedFile.name, type: attachedFile.type, data: attachedFile.data, text: attachedFile.text } : null
+                        })
+                    });
+
+                    const data = await response.json();
+                    loadingDiv.remove();
+
+                    if (response.ok && data.reply) {
+                        activeChat.messages.push({ role: 'bot', content: data.reply });
+                    } else {
+                        activeChat.messages.push({ role: 'bot', content: `⚠️ Erreur API : ${data.error || data.message || 'Erreur inconnue'}` });
+                    }
+                }
+            } catch (err) {
+                loadingDiv.remove();
+                activeChat.messages.push({ role: 'bot', content: '⚠️ Impossible de contacter le serveur backend.' });
+            }
+
+            saveChats();
+            renderMessages();
+        };
+
+        if (chats.length === 0) createNewChat();
+        else { currentChatId = chats[0].id; renderSidebar(); renderMessages(); }
+    </script>
 </body>
-                    </html>
-                    
+</html>
