@@ -83,5 +83,5 @@ FORMAT DE SORTIE JSON STRICT :
   } catch (error) {
     return { selectedModel: FALLBACK_MODEL, agent: 'general', activeProject: 'none', reasoning: 'Catch error' };
   }
-}
-  
+  }
+          
