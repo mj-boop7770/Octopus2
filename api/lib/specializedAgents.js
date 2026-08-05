@@ -5,19 +5,15 @@ class SpecializedAgentsManager {
         this.agents = {
             coder: {
                 name: 'DevPro',
-                systemPrompt: `Vous êtes DevPro, un expert en développement logiciel, architecture web, et debugging.
-Vous donnez des réponses précises, du code propre, bien structuré et optimisé.
-Formattez toujours les blocs de code avec la syntaxe appropriée.`
+                systemPrompt: `Vous êtes DevPro, un expert en développement logiciel, architecture web, et debugging. Vous donnez des réponses précises, du code propre, bien structuré et optimisé.`
             },
             creative: {
                 name: 'Muse',
-                systemPrompt: `Vous êtes Muse, un assistant créatif, poétique, captivant et inspirant.
-Exprimez-vous avec élégance, imagination et style.`
+                systemPrompt: `Vous êtes Muse, un assistant créatif, poétique, captivant et inspirant.`
             },
             concise: {
                 name: 'Flash',
-                systemPrompt: `Vous êtes Flash. Soyez ultra-concis, direct, clair et synthétique.
-Allez droit au but sans fioritures.`
+                systemPrompt: `Vous êtes Flash. Soyez ultra-concis, direct, clair et synthétique.`
             },
             standard: {
                 name: 'Octopus',
@@ -33,7 +29,7 @@ Allez droit au but sans fioritures.`
 
     async processWithAgent(mode, userPrompt, contextMessages = [], fileData = null) {
         const systemPrompt = this.getAgentPrompt(mode);
-        const memContext = await memoryManager.getRelevantContext(userPrompt);
+        const memContext = memoryManager.getRelevantContext ? await memoryManager.getRelevantContext(userPrompt) : "";
 
         let finalSystemPrompt = systemPrompt;
         if (memContext) {
@@ -58,4 +54,51 @@ Allez droit au but sans fioritures.`
     }
 }
 
-export default new SpecializedAgentsManager();
+const managerInstance = new SpecializedAgentsManager();
+
+export default async function runSpecializedAgent({ plan, messages, contextData, mode, image, keys }) {
+    const lastUserMessage = messages[messages.length - 1]?.content || "";
+    const formattedMessages = await managerInstance.processWithAgent(mode, lastUserMessage, messages.slice(0, -1));
+
+    if (contextData) {
+        formattedMessages.unshift({ role: 'system', content: `[DONNÉES DU CONTEXTE EN TEMPS RÉEL]:\n${contextData}` });
+    }
+
+    const apiKey = keys.groq || keys.openrouter || keys.gemini;
+    if (!apiKey) {
+        return {
+            response: "Clé API non disponible sur le serveur Vercel.",
+            usedModel: plan.selectedModel
+        };
+    }
+
+    try {
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${keys.groq}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: 'llama-3.1-8b-instant',
+                messages: formattedMessages,
+                temperature: 0.7
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Erreur API Provider: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        return {
+            response: data.choices?.[0]?.message?.content || "Aucune réponse générée.",
+            usedModel: plan.selectedModel
+        };
+    } catch (err) {
+        return {
+            response: `Erreur lors de l'exécution de l'agent: ${err.message}`,
+            usedModel: plan.selectedModel
+        };
+    }
+}
