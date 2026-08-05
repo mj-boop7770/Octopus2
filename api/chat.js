@@ -1,130 +1,68 @@
-// api/chat.js - Entrypoint principal Octopus2
-import { planRequest } from './lib/planner.js';
-import runSpecializedAgent from './lib/specializedAgents.js';
-
-let getChatHistory, saveChatMessage, writeGitHubFile;
-
-try {
-  const jsonbin = await import('./lib/jsonbin.js');
-  getChatHistory = jsonbin.getChatHistory;
-  saveChatMessage = jsonbin.saveChatMessage;
-} catch (e) {}
-
-try {
-  const github = await import('./lib/githubTools.js');
-  writeGitHubFile = github.writeGitHubFile;
-} catch (e) {}
-
-async function searchTavily(query, apiKey) {
-  if (!apiKey || !query.trim()) return [];
-  try {
-    const res = await fetch('https://api.tavily.com/search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ api_key: apiKey, query, search_depth: "basic", max_results: 3 })
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return data.results || [];
-  } catch {
-    return [];
-  }
-}
-
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Méthode non autorisée' });
-  }
+    // Configuration des en-têtes CORS
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-  const { messages, message, webSearch, sessionId, hasImage, mode, image } = req.body;
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
 
-  // Reconstitution du tableau de messages si seul 'message' est envoyé par app.js
-  const formattedMessages = messages || (message ? [{ role: 'user', content: message }] : []);
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Méthode non autorisée. Utilisez POST.' });
+    }
 
-  if (formattedMessages.length === 0) {
-    return res.status(400).json({ error: 'Messages requis' });
-  }
+    try {
+        // Chargement dynamique sécurisé des modules dépendants
+        const { planRequest } = await import('./lib/planner.js');
+        const { default: runSpecializedAgent } = await import('./lib/specializedAgents.js');
 
-  const keys = {
-    groq: process.env.GROQ_API_KEY,
-    gemini: process.env.GEMINI_API_KEY,
-    openrouter: process.env.OPENROUTER_API_KEY,
-    tavily: process.env.TAVILY_API_KEY,
-    github: process.env.GITHUB_TOKEN
-  };
+        const { messages = [], image = null, mode = 'standard', webSearch = false } = req.body || {};
 
-  const lastUserMsg = formattedMessages[formattedMessages.length - 1]?.content || "";
-
-  try {
-    let historySummary = "";
-    if (sessionId && getChatHistory) {
-      try {
-        const historyData = await getChatHistory(sessionId);
-        if (Array.isArray(historyData)) {
-          historySummary = historyData.slice(-4).map(m => `${m.role}: ${m.content}`).join(" | ");
+        if (!Array.isArray(messages) || messages.length === 0) {
+            return res.status(400).json({ error: 'Aucun message fourni dans la requête.' });
         }
-      } catch (e) {}
+
+        const lastUserMessage = messages[messages.length - 1]?.content || '';
+        
+        // Récupération des clés d'API depuis l'environnement Vercel
+        const apiKeys = {
+            groq: process.env.GROQ_API_KEY,
+            openrouter: process.env.OPENROUTER_API_KEY,
+            gemini: process.env.GEMINI_API_KEY
+        };
+
+        // 1. Analyse du besoin via le Planner
+        const plan = await planRequest(
+            lastUserMessage,
+            "",
+            Boolean(image),
+            apiKeys.groq
+        );
+
+        // 2. Traitement par l'Agent Spécialisé
+        const result = await runSpecializedAgent({
+            plan,
+            messages,
+            contextData: webSearch ? "Recherche web activée" : null,
+            mode,
+            image,
+            keys: apiKeys
+        });
+
+        return res.status(200).json({
+            response: result.response,
+            model: result.usedModel || plan.selectedModel,
+            agent: plan.agent
+        });
+
+    } catch (error) {
+        // En cas d'erreur de chargement ou d'exécution, on renvoie un JSON explicite au lieu de faire planter Node
+        console.error("Erreur Backend Runtime:", error);
+        return res.status(500).json({
+            error: "Erreur lors du traitement de la requête sur le serveur.",
+            details: error.message
+        });
     }
-
-    // 1. Détermination du plan via Planner
-    const plan = await planRequest(lastUserMsg, historySummary, Boolean(hasImage || image), keys.groq);
-
-    // 2. Traitement des outils
-    let contextData = "";
-    if (webSearch || plan.needsWebSearch) {
-      const webResults = await searchTavily(lastUserMsg, keys.tavily);
-      if (webResults.length > 0) {
-        contextData += `\n[DONNÉES WEB]:\n` + webResults.map(r => `- ${r.title}: ${r.content}`).join('\n');
-      }
-    }
-
-    if (plan.agent === 'github' && writeGitHubFile) {
-      const writeMatch = lastUserMsg.match(/(?:crée|écris|modifie)\s+(?:le\s+fichier\s+)?([\w\.\-]+)\s+avec\s*:\s*([\s\S]+)/i);
-      if (writeMatch) {
-        const success = await writeGitHubFile(writeMatch[1], writeMatch[2], `Mise à jour pour ${plan.activeProject}`);
-        contextData += `\n[ACTION GITHUB]: Fichier "${writeMatch[1]}" -> ${success ? 'SUCCÈS' : 'ÉCHEC'}`;
-      }
-    }
-
-    // 3. Exécution via l'agent spécialisé
-    const agentResult = await runSpecializedAgent({
-      plan,
-      messages: formattedMessages,
-      contextData,
-      mode,
-      image,
-      keys
-    });
-
-    const realSystemInfo = `[SYSTEM_INFO]
-- Agent actif : ${plan.agent}
-- Modèle utilisé : ${agentResult.usedModel?.modelName || 'Inconnu'} (${agentResult.usedModel?.provider || 'IA'})
-- Projet détecté : ${plan.activeProject}
-[/SYSTEM_INFO]\n\n`;
-
-    const finalResponse = realSystemInfo + agentResult.response;
-
-    if (sessionId && saveChatMessage) {
-      saveChatMessage(sessionId, lastUserMsg, finalResponse).catch(() => {});
-    }
-
-    return res.status(200).json({
-      reply: finalResponse,
-      meta: {
-        agentUsed: plan.agent,
-        activeProject: plan.activeProject,
-        modelUsed: agentResult.usedModel?.modelName,
-        provider: agentResult.usedModel?.provider,
-        reasoning: plan.reasoning
-      }
-    });
-
-  } catch (error) {
-    console.error("Erreur serveur API:", error);
-    return res.status(500).json({
-      error: "Erreur serveur.",
-      details: error.message
-    });
-  }
-        }
-    
+          }
+      
