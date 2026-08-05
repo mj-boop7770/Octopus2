@@ -1,9 +1,8 @@
-// api/lib/planner.js
-const { MODEL_REGISTRY } = require('./modelRegistry.js');
+import { MODEL_REGISTRY } from './modelRegistry.js';
 
 const FALLBACK_MODEL = MODEL_REGISTRY.find(m => m.id === 'groq-planner-fast') || MODEL_REGISTRY[0];
 
-async function planRequest(userMessage, historySummary = "", hasImage = false, groqApiKey) {
+export async function planRequest(userMessage, historySummary = "", hasImage = false, groqApiKey) {
   if (!groqApiKey) {
     return {
       selectedModel: FALLBACK_MODEL,
@@ -24,7 +23,7 @@ CATALOGUE DES IA DISPONIBLES :
 ${registryDescription}
 
 RÈGLES D'AIGUILLAGE STRICTES :
-1. "general" (Agent) : Pour toute discussion, question, salutation, ou simple phrase d'information (ex: "Mon projet s'appelle X").
+1. "general" (Agent) : Pour toute discussion, question, salutation, ou simple phrase d'information.
 2. "code" (Agent) : UNIQUEMENT si l'utilisateur demande EXPLICITEMENT d'écrire, modifier ou générer du code.
 3. "debug" (Agent) : UNIQUEMENT si l'utilisateur fournit une erreur ou demande de corriger un bug technique.
 4. "github" (Agent) : UNIQUEMENT pour une action directe sur le dépôt GitHub.
@@ -85,6 +84,4 @@ FORMAT DE SORTIE JSON STRICT :
     return { selectedModel: FALLBACK_MODEL, agent: 'general', activeProject: 'none', reasoning: 'Catch error' };
   }
 }
-
-module.exports = { planRequest };
-          
+  
