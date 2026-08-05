@@ -1,16 +1,17 @@
 // api/chat.js - Entrypoint principal Octopus2
-const { planRequest } = require('./lib/planner.js');
-const { runSpecializedAgent } = require('./lib/specializedAgents.js');
+import { planRequest } from './lib/planner.js';
+import runSpecializedAgent from './lib/specializedAgents.js';
 
 let getChatHistory, saveChatMessage, writeGitHubFile;
+
 try {
-  const jsonbin = require('./lib/jsonbin.js');
+  const jsonbin = await import('./lib/jsonbin.js');
   getChatHistory = jsonbin.getChatHistory;
   saveChatMessage = jsonbin.saveChatMessage;
 } catch (e) {}
 
 try {
-  const github = require('./lib/githubTools.js');
+  const github = await import('./lib/githubTools.js');
   writeGitHubFile = github.writeGitHubFile;
 } catch (e) {}
 
@@ -30,14 +31,17 @@ async function searchTavily(query, apiKey) {
   }
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Méthode non autorisée' });
   }
 
-  const { messages, webSearch, sessionId, hasImage } = req.body;
+  const { messages, message, webSearch, sessionId, hasImage, mode, image } = req.body;
 
-  if (!messages || !Array.isArray(messages) || messages.length === 0) {
+  // Reconstitution du tableau de messages si seul 'message' est envoyé par app.js
+  const formattedMessages = messages || (message ? [{ role: 'user', content: message }] : []);
+
+  if (formattedMessages.length === 0) {
     return res.status(400).json({ error: 'Messages requis' });
   }
 
@@ -49,7 +53,7 @@ module.exports = async function handler(req, res) {
     github: process.env.GITHUB_TOKEN
   };
 
-  const lastUserMsg = messages[messages.length - 1]?.content || "";
+  const lastUserMsg = formattedMessages[formattedMessages.length - 1]?.content || "";
 
   try {
     let historySummary = "";
@@ -63,7 +67,7 @@ module.exports = async function handler(req, res) {
     }
 
     // 1. Détermination du plan via Planner
-    const plan = await planRequest(lastUserMsg, historySummary, Boolean(hasImage), keys.groq);
+    const plan = await planRequest(lastUserMsg, historySummary, Boolean(hasImage || image), keys.groq);
 
     // 2. Traitement des outils
     let contextData = "";
@@ -85,15 +89,16 @@ module.exports = async function handler(req, res) {
     // 3. Exécution via l'agent spécialisé
     const agentResult = await runSpecializedAgent({
       plan,
-      messages,
+      messages: formattedMessages,
       contextData,
+      mode,
+      image,
       keys
     });
 
-    // En-tête officiel Vercel (Données réelles du système)
     const realSystemInfo = `[SYSTEM_INFO]
 - Agent actif : ${plan.agent}
-- Modèle utilisé : ${agentResult.usedModel.modelName} (${agentResult.usedModel.provider})
+- Modèle utilisé : ${agentResult.usedModel?.modelName || 'Inconnu'} (${agentResult.usedModel?.provider || 'IA'})
 - Projet détecté : ${plan.activeProject}
 [/SYSTEM_INFO]\n\n`;
 
@@ -108,8 +113,8 @@ module.exports = async function handler(req, res) {
       meta: {
         agentUsed: plan.agent,
         activeProject: plan.activeProject,
-        modelUsed: agentResult.usedModel.modelName,
-        provider: agentResult.usedModel.provider,
+        modelUsed: agentResult.usedModel?.modelName,
+        provider: agentResult.usedModel?.provider,
         reasoning: plan.reasoning
       }
     });
@@ -121,5 +126,5 @@ module.exports = async function handler(req, res) {
       details: error.message
     });
   }
-};
-         
+        }
+    
