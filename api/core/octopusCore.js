@@ -1,9 +1,10 @@
 // api/core/octopusCore.js
-// Cœur central d'orchestration d'Octopus2 (Mis à jour avec la Security Layer)
+// Cœur central d'orchestration complet d'Octopus2
 
 const { validateAndSanitizeRequest } = require('../lib/securityLayer.js');
 const { planRequest } = require('../lib/planner.js');
 const { runSpecializedAgent } = require('../lib/specializedAgents.js');
+const { reviewAndRefineResponse } = require('../lib/reviewer.js');
 const { getChatHistory, saveChatMessage } = require('../lib/jsonbin.js');
 const { loadLongTermMemory } = require('../lib/longTermMemory.js');
 
@@ -21,7 +22,7 @@ async function handleOctopusCore(rawReqBody, rawHeaders) {
   // 3. Étape du Routeur IA (Planner) : Choix de l'agent et du modèle
   const plan = await planRequest(userLatestMessage, historySummary, hasImage, keys.groq);
 
-  // 4. Constitution du contexte global
+  // 4. Constitution du contexte global pour l'agent
   const globalContextData = `Mémoire globale du projet: ${JSON.stringify(memoryContext)}\n\nHistorique récent:\n${historySummary}`;
 
   // 5. Exécution par l'Agent Spécialisé correspondant
@@ -32,12 +33,20 @@ async function handleOctopusCore(rawReqBody, rawHeaders) {
     keys
   });
 
-  // 6. Sauvegarde automatique de l'échange dans la mémoire JSONBin
+  // 6. Étape de relecture et de validation par le Reviewer (si code ou GitHub)
+  const finalResponseText = await reviewAndRefineResponse(
+    plan.agent, 
+    executionResult.response, 
+    userLatestMessage, 
+    keys.groq
+  );
+
+  // 7. Sauvegarde automatique de l'échange dans la mémoire JSONBin
   await saveChatMessage(sessionId, { role: 'user', content: userLatestMessage });
-  await saveChatMessage(sessionId, { role: 'assistant', content: executionResult.response });
+  await saveChatMessage(sessionId, { role: 'assistant', content: finalResponseText });
 
   return {
-    response: executionResult.response,
+    response: finalResponseText,
     metadata: {
       agentUsed: plan.agent,
       modelUsed: executionResult.usedModel,
@@ -48,4 +57,4 @@ async function handleOctopusCore(rawReqBody, rawHeaders) {
 }
 
 module.exports = { handleOctopusCore };
-                                 
+    
