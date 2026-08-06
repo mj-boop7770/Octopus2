@@ -1,0 +1,13 @@
+{
+  "name": "octopus2",
+  "version": "1.0.0",
+  "description": "Système multi-agents orchestré pour Octopus2",
+  "main": "api/chat.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {},
+  "engines": {
+    "node": "18.x"
+  }
+}
