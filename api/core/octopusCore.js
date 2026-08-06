@@ -1,31 +1,30 @@
 // api/core/octopusCore.js
-// Cœur central d'orchestration d'Octopus2
+// Cœur central d'orchestration d'Octopus2 (Mis à jour avec la Security Layer)
 
+const { validateAndSanitizeRequest } = require('../lib/securityLayer.js');
 const { planRequest } = require('../lib/planner.js');
 const { runSpecializedAgent } = require('../lib/specializedAgents.js');
-const { loadLongTermMemory, saveLongTermMemory } = require('../lib/longTermMemory.js');
 const { getChatHistory, saveChatMessage } = require('../lib/jsonbin.js');
+const { loadLongTermMemory } = require('../lib/longTermMemory.js');
 
-async function handleOctopusCore(reqBody, keys) {
-  const { messages, sessionId = 'default-session', hasImage = false } = reqBody;
-  
-  if (!messages || messages.length === 0) {
-    throw new Error("Aucun message fourni pour l'orchestration.");
-  }
+async function handleOctopusCore(rawReqBody, rawHeaders) {
+  // 1. Passage par la couche de sécurité et de nettoyage
+  const secureData = validateAndSanitizeRequest(rawReqBody, rawHeaders);
+  const { sessionId, messages, hasImage, keys } = secureData;
 
   const userLatestMessage = messages[messages.length - 1].content;
 
-  // 1. Récupération de l'historique et de la mémoire à long terme
+  // 2. Récupération de l'historique (JSONBin) et de la mémoire à long terme
   const historySummary = await getChatHistory(sessionId);
   const memoryContext = await loadLongTermMemory();
 
-  // 2. Étape du Routeur IA (Planner) : Choix de l'agent et du modèle
+  // 3. Étape du Routeur IA (Planner) : Choix de l'agent et du modèle
   const plan = await planRequest(userLatestMessage, historySummary, hasImage, keys.groq);
 
-  // 3. Fusion du contexte mémoire pour l'agent
+  // 4. Constitution du contexte global
   const globalContextData = `Mémoire globale du projet: ${JSON.stringify(memoryContext)}\n\nHistorique récent:\n${historySummary}`;
 
-  // 4. Exécution par l'Agent Spécialisé correspondant
+  // 5. Exécution par l'Agent Spécialisé correspondant
   const executionResult = await runSpecializedAgent({
     plan,
     messages,
@@ -33,7 +32,7 @@ async function handleOctopusCore(reqBody, keys) {
     keys
   });
 
-  // 5. Sauvegarde de l'échange dans la mémoire JSONBin
+  // 6. Sauvegarde automatique de l'échange dans la mémoire JSONBin
   await saveChatMessage(sessionId, { role: 'user', content: userLatestMessage });
   await saveChatMessage(sessionId, { role: 'assistant', content: executionResult.response });
 
@@ -49,4 +48,4 @@ async function handleOctopusCore(reqBody, keys) {
 }
 
 module.exports = { handleOctopusCore };
-      
+                                 
