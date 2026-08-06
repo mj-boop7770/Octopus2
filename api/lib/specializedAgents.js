@@ -1,4 +1,5 @@
-import memoryManager from './memory.js';
+// api/lib/specializedAgents.js
+const { getProjectMemory } = require('./memory.js');
 
 class SpecializedAgentsManager {
     constructor() {
@@ -29,11 +30,18 @@ class SpecializedAgentsManager {
 
     async processWithAgent(mode, userPrompt, contextMessages = [], fileData = null) {
         const systemPrompt = this.getAgentPrompt(mode);
-        const memContext = memoryManager.getRelevantContext ? await memoryManager.getRelevantContext(userPrompt) : "";
+        
+        // Récupération sécurisée du contexte projet CommonJS
+        let memContext = "";
+        try {
+            memContext = getProjectMemory ? getProjectMemory() : "";
+        } catch (e) {
+            memContext = "";
+        }
 
         let finalSystemPrompt = systemPrompt;
         if (memContext) {
-            finalSystemPrompt += `\n\n[INFORMATIONS EN MÉMOIRE CONTEXTUELLE]:\n${memContext}`;
+            finalSystemPrompt += `\n\n${memContext}`;
         }
 
         const messages = [
@@ -56,7 +64,7 @@ class SpecializedAgentsManager {
 
 const managerInstance = new SpecializedAgentsManager();
 
-export default async function runSpecializedAgent({ plan, messages, contextData, mode, image, keys }) {
+async function runSpecializedAgent({ plan, messages, contextData, mode, image, keys }) {
     const lastUserMessage = messages[messages.length - 1]?.content || "";
     const formattedMessages = await managerInstance.processWithAgent(mode, lastUserMessage, messages.slice(0, -1));
 
@@ -64,23 +72,34 @@ export default async function runSpecializedAgent({ plan, messages, contextData,
         formattedMessages.unshift({ role: 'system', content: `[DONNÉES DU CONTEXTE EN TEMPS RÉEL]:\n${contextData}` });
     }
 
-    const apiKey = keys.groq || keys.openrouter || keys.gemini;
-    if (!apiKey) {
+    // Utilisation du modèle sélectionné par le planner si disponible, ou fallback sur groq/openrouter/gemini
+    const activeApiKey = keys.groq || keys.openrouter || keys.gemini;
+    if (!activeApiKey) {
         return {
             response: "Clé API non disponible sur le serveur Vercel.",
             usedModel: plan.selectedModel
         };
     }
 
+    // Détermination dynamique du modèle et de l'endpoint en fonction du plan du Planner
+    let apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
+    let apiKeyToUse = keys.groq;
+    let modelName = plan?.selectedModel?.modelName || 'llama-3.1-8b-instant';
+
+    if (plan?.selectedModel?.provider === 'openrouter') {
+        apiUrl = 'https://openrouter.ai/api/v1/chat/completions';
+        apiKeyToUse = keys.openrouter || keys.groq;
+    }
+
     try {
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${keys.groq}`,
+                'Authorization': `Bearer ${apiKeyToUse}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: 'llama-3.1-8b-instant',
+                model: modelName,
                 messages: formattedMessages,
                 temperature: 0.7
             })
@@ -102,3 +121,6 @@ export default async function runSpecializedAgent({ plan, messages, contextData,
         };
     }
 }
+
+module.exports = { runSpecializedAgent };
+            
