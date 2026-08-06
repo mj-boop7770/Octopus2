@@ -1,7 +1,7 @@
-// lib/githubTools.js
+// api/lib/githubTools.js
 
 // LECTURE DE FICHIERS SUR GITHUB
-export async function getGitHubFile(filePath) {
+async function getGitHubFile(filePath) {
   const token = process.env.GITHUB_TOKEN;
   const repo = process.env.GITHUB_REPO; // Format: "nom-utilisateur/nom-repo"
 
@@ -26,7 +26,7 @@ export async function getGitHubFile(filePath) {
 }
 
 // ÉCRITURE ET MODIFICATION DE FICHIERS SUR GITHUB
-export async function writeGitHubFile(filePath, content, commitMessage = "Mise à jour automatique par Octopus2") {
+async function writeGitHubFile(filePath, content, commitMessage = "Mise à jour automatique par Octopus2") {
   const token = process.env.GITHUB_TOKEN;
   const repo = process.env.GITHUB_REPO;
 
@@ -72,3 +72,8 @@ export async function writeGitHubFile(filePath, content, commitMessage = "Mise �
     return false;
   }
 }
+
+module.exports = {
+  getGitHubFile,
+  writeGitHubFile
+};
