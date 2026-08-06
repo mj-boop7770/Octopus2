@@ -1,10 +1,11 @@
 // api/lib/jsonbin.js
+// Gestion de l'historique des discussions via JSONBin
 
 const JSONBIN_API_KEY = process.env.JSONBIN_API_KEY;
 const CHAT_BIN_ID = process.env.JSONBIN_CHAT_BIN_ID;
 
 // Charger l'historique d'une session depuis JSONbin
-export async function getChatHistory(sessionId) {
+async function getChatHistory(sessionId) {
   if (!JSONBIN_API_KEY || !CHAT_BIN_ID) return [];
   try {
     const res = await fetch(`https://api.jsonbin.io/v3/b/${CHAT_BIN_ID}/latest`, {
@@ -12,15 +13,21 @@ export async function getChatHistory(sessionId) {
     });
     if (!res.ok) return [];
     const data = await res.json();
-    return data.record?.[sessionId] || [];
+    const history = data.record?.[sessionId] || [];
+    
+    // Formater l'historique en texte lisible pour le Planner / Contexte
+    if (Array.isArray(history) && history.length > 0) {
+      return history.map(m => `${m.role === 'user' ? 'Utilisateur' : 'Assistant'} : ${m.content}`).join('\n');
+    }
+    return "";
   } catch (e) {
     console.error("Erreur lecture JSONBin:", e);
-    return [];
+    return "";
   }
 }
 
-// Sauvegarder les nouveaux messages dans JSONbin
-export async function saveChatMessage(sessionId, userMsg, botReply) {
+// Sauvegarder un message individuel dans JSONbin (Compatible avec octopusCore.js)
+async function saveChatMessage(sessionId, messageObj) {
   if (!JSONBIN_API_KEY || !CHAT_BIN_ID) return;
   try {
     const res = await fetch(`https://api.jsonbin.io/v3/b/${CHAT_BIN_ID}/latest`, {
@@ -34,12 +41,12 @@ export async function saveChatMessage(sessionId, userMsg, botReply) {
 
     if (!record[sessionId]) record[sessionId] = [];
 
-    record[sessionId].push({ role: 'user', content: userMsg });
-    record[sessionId].push({ role: 'assistant', content: botReply });
+    // messageObj attend { role: 'user' | 'assistant', content: '...' }
+    record[sessionId].push(messageObj);
 
-    // Garde les 20 derniers messages par discussion pour optimiser l'espace
-    if (record[sessionId].length > 20) {
-      record[sessionId] = record[sessionId].slice(-20);
+    // Garde les 30 derniers messages par discussion pour optimiser l'espace
+    if (record[sessionId].length > 30) {
+      record[sessionId] = record[sessionId].slice(-30);
     }
 
     await fetch(`https://api.jsonbin.io/v3/b/${CHAT_BIN_ID}`, {
@@ -53,5 +60,10 @@ export async function saveChatMessage(sessionId, userMsg, botReply) {
   } catch (e) {
     console.error("Erreur écriture JSONBin:", e);
   }
-      }
-    
+}
+
+module.exports = {
+  getChatHistory,
+  saveChatMessage
+};
+                            
