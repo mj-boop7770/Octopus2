@@ -1,47 +1,56 @@
-// lib/reviewer.js
+// api/lib/reviewer.js
+// Module de relecture, validation et correction des réponses d'Octopus2
 
-export async function verifyAndRefine(reply, userMessage, apiKey) {
-  if (!reply || !apiKey) return reply;
+async function reviewAndRefineResponse(agentType, rawResponse, userQuery, groqApiKey) {
+  // Si ce n'est pas du code ou une tâche critique, on laisse passer tel quel pour garder de la vitesse
+  if (agentType !== 'code' && agentType !== 'github') {
+    return rawResponse;
+  }
 
-  // Prompt d'inspection invisible
-  const systemPrompt = `Tu es le Reviewer Backend d'Octopus2 Engine.
-Ta seule mission est de vérifier la qualité technique de la réponse générée.
+  console.log(`[Reviewer] Analyse et relecture de la réponse pour l'agent : ${agentType}`);
 
-RÈGLES ABSOLUES ET STRICTES :
-1. Sois 100% INVISIBLE et MUET.
-2. Ne dis JAMAIS "La réponse est correcte", "Voici la réponse corrigée", "Bonjour" ou quoi que ce soit d'autre.
-3. Si le texte contient du code (HTML, CSS, JS, JSON), corrige uniquement les erreurs de syntaxe ou d'incohérence SILENCIEUSEMENT.
-4. Si la réponse est déjà bonne, RENVOIE LA EXACTEMENT À L'IDENTIQUE, mot pour mot, sans rien ajouter.
-5. Ne modifie JAMAIS le ton ou les salutations de la réponse.
-6. Ta sortie doit contenir uniquement le texte/code final destiné à l'utilisateur. Aucun méta-commentaire.`;
-
+  // Pour les tâches de code/GitHub, on peut effectuer une passe de vérification rapide via un modèle léger (Groq)
   try {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
+    const prompt = `Tu es un réviseur technique rigoureux. Vérifie le texte/code suivant généré pour répondre à la demande de l'utilisateur. 
+    Assure-toi qu'il n'y a pas d'erreur grossière, de balise cassée ou d'oubli critique. 
+    Renvoie le contenu corrigé ou validé directement, sans bavardage inutile.
+
+    Demande initiale : "${userQuery}"
+
+    Contenu à valider :
+    """
+    ${rawResponse}
+    """`;
+
+    // Appel rapide à l'API Groq pour la relecture
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
+        "Authorization": `Bearer ${groqApiKey}`,
+        "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `[MESSAGE UTILISATEUR ORIGINAL]: ${userMessage}\n\n[RÉPONSE À INSPECTER ET CORRIGER SILENCIEUSEMENT]:\n${reply}` }
-        ],
-        temperature: 0.0, // Précision maximale
-        max_tokens: 1500
+        model: "llama-3.1-8b-instant",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.1,
+        max_tokens: 2048
       })
     });
 
-    if (!res.ok) return reply; // Fallback sur la réponse originale si l'API échoue
+    if (!response.ok) {
+      console.warn("[Reviewer] Avertissement : Impossible d'exécuter la relecture automatique, retour du contenu brut.");
+      return rawResponse;
+    }
 
-    const data = await res.json();
-    const refined = data.choices?.[0]?.message?.content?.trim();
+    const data = await response.json();
+    const refinedContent = data.choices?.[0]?.message?.content || rawResponse;
+    return refinedContent;
 
-    // Si le reviewer renvoie quelque chose de valide, on l'utilise, sinon fallback
-    return refined || reply;
-  } catch (e) {
-    console.error("Erreur Reviewer:", e);
-    return reply; // Sécurité : en cas de bug du reviewer, on garde la réponse originale
+  } catch (error) {
+    console.error("[Reviewer] Erreur lors de la relecture, repli sur le contenu d'origine :", error.message);
+    return rawResponse;
   }
 }
+
+module.exports = { reviewAndRefineResponse };
+  
