@@ -1,8 +1,9 @@
-import { MODEL_REGISTRY } from './modelRegistry.js';
+// api/lib/planner.js
+const { MODEL_REGISTRY } = require('./modelRegistry.js');
 
 const FALLBACK_MODEL = MODEL_REGISTRY.find(m => m.id === 'groq-planner-fast') || MODEL_REGISTRY[0];
 
-export async function planRequest(userMessage, historySummary = "", hasImage = false, groqApiKey) {
+async function planRequest(userMessage, historySummary = "", hasImage = false, groqApiKey) {
   if (!groqApiKey) {
     return {
       selectedModel: FALLBACK_MODEL,
@@ -33,7 +34,7 @@ RÈGLES DE SÉLECTION DU MODÈLE (selectedModelId) :
 - Pour du code explicite ou action GitHub, choisis "openrouter-qwen-coder".
 - Pour du debugging complexe, choisis "openrouter-deepseek-debug".
 - Pour la réflexion globale ou les tâches lourdes, choisis "groq-brain-70b".
-- Pour les conversations simples ou rapides, choisis "groq-planner-fast".
+- For les conversations simples ou rapides, choisis "groq-planner-fast".
 
 FORMAT DE SORTIE JSON STRICT :
 {
@@ -83,5 +84,7 @@ FORMAT DE SORTIE JSON STRICT :
   } catch (error) {
     return { selectedModel: FALLBACK_MODEL, agent: 'general', activeProject: 'none', reasoning: 'Catch error' };
   }
-  }
-          
+}
+
+module.exports = { planRequest };
+    
