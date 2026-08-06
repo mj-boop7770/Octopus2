@@ -1,9 +1,5 @@
 // api/lib/longTermMemory.js
-
-/**
- * Niveau 11 — Mémoire Globale & Contextuelle de Session (GitHub API)
- * Charge et sauvegarde la mémoire globale du projet et des échanges passés.
- */
+// Mémoire Globale & Contextuelle de Session (GitHub API)
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const GITHUB_REPO = process.env.GITHUB_REPO; // Format: "user/repo"
@@ -13,7 +9,7 @@ const FILE_PATH = "memory.json";
 /**
  * 1. Charger la mémoire globale du projet / historique des sessions
  */
-export async function getLongTermMemory() {
+async function loadLongTermMemory() {
   if (!GITHUB_TOKEN || !GITHUB_REPO) return "";
 
   try {
@@ -53,11 +49,10 @@ export async function getLongTermMemory() {
 /**
  * 2. Mettre à jour le résumé contextuel global sur GitHub
  */
-export async function updateGlobalMemory(newSummary, newNotes = []) {
+async function updateGlobalMemory(newSummary, newNotes = []) {
   if (!GITHUB_TOKEN || !GITHUB_REPO) return false;
 
   try {
-    // Étape A : Récupérer le fichier actuel pour obtenir le SHA
     const getRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}?ref=${GITHUB_BRANCH}`, {
       headers: {
         'Authorization': `Bearer ${GITHUB_TOKEN}`,
@@ -78,16 +73,14 @@ export async function updateGlobalMemory(newSummary, newNotes = []) {
       } catch (e) {}
     }
 
-    // Étape B : Fusionner la mémoire
     const updatedMemory = {
       lastUpdated: new Date().toISOString(),
       summary: newSummary || existingData.summary || "Projet en cours de développement.",
-      contextNotes: Array.from(new Set([...(existingData.contextNotes || []), ...newNotes])).slice(-15) // Conserve les 15 notes les plus récentes
+      contextNotes: Array.from(new Set([...(existingData.contextNotes || []), ...newNotes])).slice(-15)
     };
 
     const updatedContent = Buffer.from(JSON.stringify(updatedMemory, null, 2)).toString('base64');
 
-    // Étape C : Commit sur GitHub
     const putRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}`, {
       method: 'PUT',
       headers: {
@@ -109,4 +102,10 @@ export async function updateGlobalMemory(newSummary, newNotes = []) {
     return false;
   }
 }
-  
+
+module.exports = { 
+  loadLongTermMemory, 
+  getLongTermMemory: loadLongTermMemory, // Alias par sécurité
+  updateGlobalMemory 
+};
+        
