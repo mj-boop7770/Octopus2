@@ -1,126 +1,81 @@
 // api/lib/specializedAgents.js
 const { getProjectMemory } = require('./memory.js');
 
-class SpecializedAgentsManager {
-    constructor() {
-        this.agents = {
-            coder: {
-                name: 'DevPro',
-                systemPrompt: `Vous êtes DevPro, un expert en développement logiciel, architecture web, et debugging. Vous donnez des réponses précises, du code propre, bien structuré et optimisé.`
-            },
-            creative: {
-                name: 'Muse',
-                systemPrompt: `Vous êtes Muse, un assistant créatif, poétique, captivant et inspirant.`
-            },
-            concise: {
-                name: 'Flash',
-                systemPrompt: `Vous êtes Flash. Soyez ultra-concis, direct, clair et synthétique.`
-            },
-            standard: {
-                name: 'Octopus',
-                systemPrompt: `Vous êtes MUJOS-OCTOPUS2, un assistant IA polyvalent, intelligent, courtois et efficace.`
-            }
-        };
-    }
+const MODE_PROMPTS = {
+  standard: 'Tu es MUJOS-OCTOPUS2, un assistant IA polyvalent, courtois et efficace.',
+  creative: 'Tu es Muse, un assistant créatif, imaginatif et inspirant.',
+  concise: 'Tu es Flash. Réponds de façon concise, directe et claire.',
+  code: 'Tu es DevPro, un développeur senior. Fournis des réponses techniques précises, du code fonctionnel et explique les changements utiles.'
+};
 
-    getAgentPrompt(mode) {
-        const agent = this.agents[mode] || this.agents.standard;
-        return agent.systemPrompt;
-    }
-
-    async processWithAgent(mode, userPrompt, contextMessages = [], fileData = null) {
-        const systemPrompt = this.getAgentPrompt(mode);
-        
-        // Récupération sécurisée du contexte projet CommonJS
-        let memContext = "";
-        try {
-            memContext = getProjectMemory ? getProjectMemory() : "";
-        } catch (e) {
-            memContext = "";
-        }
-
-        let finalSystemPrompt = systemPrompt;
-        if (memContext) {
-            finalSystemPrompt += `\n\n${memContext}`;
-        }
-
-        const messages = [
-            { role: 'system', content: finalSystemPrompt },
-            ...contextMessages
-        ];
-
-        if (fileData && fileData.text) {
-            messages.push({
-                role: 'user',
-                content: `${userPrompt}\n\n[FICHIER JOINT (${fileData.name})]:\n${fileData.text}`
-            });
-        } else {
-            messages.push({ role: 'user', content: userPrompt });
-        }
-
-        return messages;
-    }
+function providerFor(model) {
+  return model?.provider || 'groq';
 }
 
-const managerInstance = new SpecializedAgentsManager();
+async function runSpecializedAgent({ plan = {}, messages = [], contextData = '', mode = 'standard', keys = {} }) {
+  const selectedModel = plan.selectedModel || { provider: 'groq', modelName: 'llama-3.1-8b-instant' };
+  let provider = providerFor(selectedModel);
+  let apiUrl;
+  let apiKey;
+  let modelName = selectedModel.modelName;
 
-async function runSpecializedAgent({ plan, messages, contextData, mode, image, keys }) {
-    const lastUserMessage = messages[messages.length - 1]?.content || "";
-    const formattedMessages = await managerInstance.processWithAgent(mode, lastUserMessage, messages.slice(0, -1));
+  if (provider === 'openrouter' && keys.openrouter) {
+    apiUrl = 'https://openrouter.ai/api/v1/chat/completions';
+    apiKey = keys.openrouter;
+  } else {
+    // Gemini n'est pas compatible avec l'endpoint OpenAI utilisé par ce module.
+    // Si un fournisseur alternatif est indisponible, basculer réellement sur Groq
+    // plutôt que d'envoyer un modèle inconnu au mauvais endpoint.
+    provider = 'groq';
+    apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
+    apiKey = keys.groq;
+    modelName = providerFor(selectedModel) === 'groq' && selectedModel.modelName
+      ? selectedModel.modelName
+      : 'llama-3.1-8b-instant';
+  }
 
-    if (contextData) {
-        formattedMessages.unshift({ role: 'system', content: `[DONNÉES DU CONTEXTE EN TEMPS RÉEL]:\n${contextData}` });
-    }
+  if (!apiKey) {
+    const error = new Error(`Aucune clé API disponible pour le fournisseur ${provider}.`);
+    error.statusCode = 503;
+    throw error;
+  }
 
-    // Utilisation du modèle sélectionné par le planner si disponible, ou fallback sur groq/openrouter/gemini
-    const activeApiKey = keys.groq || keys.openrouter || keys.gemini;
-    if (!activeApiKey) {
-        return {
-            response: "Clé API non disponible sur le serveur Vercel.",
-            usedModel: plan.selectedModel
-        };
-    }
+  const systemParts = [MODE_PROMPTS[mode] || MODE_PROMPTS.standard, getProjectMemory(), contextData]
+    .filter(Boolean);
+  const conversation = messages
+    .filter((message) => message && ['user', 'assistant'].includes(message.role))
+    .map(({ role, content }) => ({ role, content: typeof content === 'string' ? content : '' }));
 
-    // Détermination dynamique du modèle et de l'endpoint en fonction du plan du Planner
-    let apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
-    let apiKeyToUse = keys.groq;
-    let modelName = plan?.selectedModel?.modelName || 'llama-3.1-8b-instant';
+  const apiMessages = [
+    { role: 'system', content: systemParts.join('\n\n') },
+    ...conversation
+  ];
 
-    if (plan?.selectedModel?.provider === 'openrouter') {
-        apiUrl = 'https://openrouter.ai/api/v1/chat/completions';
-        apiKeyToUse = keys.openrouter || keys.groq;
-    }
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      ...(provider === 'openrouter' ? { 'HTTP-Referer': process.env.APP_URL || 'https://octopus2-psi.vercel.app', 'X-Title': 'Octopus2' } : {})
+    },
+    body: JSON.stringify({ model: modelName, messages: apiMessages, temperature: 0.7 })
+  });
 
-    try {
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${apiKeyToUse}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                model: modelName,
-                messages: formattedMessages,
-                temperature: 0.7
-            })
-        });
+  if (!response.ok) {
+    const providerMessage = await response.text().catch(() => 'Réponse fournisseur indisponible');
+    console.error(`[Octopus2] ${provider} a répondu ${response.status}:`, providerMessage.slice(0, 1000));
+    const error = new Error(`Le fournisseur IA a renvoyé une erreur (${response.status}). Vérifiez la clé API et le modèle configuré.`);
+    error.statusCode = response.status === 401 || response.status === 403 ? 502 : 503;
+    throw error;
+  }
 
-        if (!response.ok) {
-            throw new Error(`Erreur API Provider: ${response.statusText}`);
-        }
+  const data = await response.json();
+  const answer = data.choices?.[0]?.message?.content;
+  if (typeof answer !== 'string' || !answer.trim()) {
+    throw new Error('Le fournisseur IA a renvoyé une réponse vide.');
+  }
 
-        const data = await response.json();
-        return {
-            response: data.choices?.[0]?.message?.content || "Aucune réponse générée.",
-            usedModel: plan.selectedModel
-        };
-    } catch (err) {
-        return {
-            response: `Erreur lors de l'exécution de l'agent: ${err.message}`,
-            usedModel: plan.selectedModel
-        };
-    }
+  return { response: answer, usedModel: { provider, modelName } };
 }
 
 module.exports = { runSpecializedAgent };
-            

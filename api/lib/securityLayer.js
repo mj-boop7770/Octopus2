@@ -1,48 +1,73 @@
 // api/lib/securityLayer.js
-// Couche de sécurité et de validation pour Octopus2
+// Validation et normalisation des requêtes reçues par l'API.
 
-function validateAndSanitizeRequest(reqBody, reqHeaders) {
-  // 1. Validation de la structure de base
-  if (!reqBody || !reqBody.messages || !Array.isArray(reqBody.messages)) {
-    throw new Error("[Security] Format de requête invalide : le tableau 'messages' est requis.");
+const MAX_MESSAGE_LENGTH = 100_000;
+const ALLOWED_MODES = new Set(['standard', 'creative', 'code', 'concise']);
+
+function validateAndSanitizeRequest(reqBody, reqHeaders = {}) {
+  if (!reqBody || typeof reqBody !== 'object' || !Array.isArray(reqBody.messages)) {
+    const error = new Error("Format de requête invalide : le tableau 'messages' est requis.");
+    error.statusCode = 400;
+    throw error;
   }
 
-  // 2. Extraction et validation de la session
-  const sessionId = reqBody.sessionId ? sanitizeString(reqBody.sessionId) : 'default-session';
+  const messages = reqBody.messages
+    .filter((message) => message && ['user', 'assistant'].includes(message.role))
+    .map((message) => ({
+      role: message.role,
+      content: sanitizeString(message.content)
+    }));
 
-  // 3. Extraction et vérification des clés API (depuis le corps ou les headers sécurisés)
+  if (messages.length === 0 || !messages.some((message) => message.role === 'user')) {
+    const error = new Error('Un message utilisateur est requis.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // Le front fournit le prompt enrichi séparément afin d'y inclure le contenu
+  // des fichiers texte joints. Il remplace seulement le dernier message user.
+  const latestUserIndex = messages.map((message) => message.role).lastIndexOf('user');
+  if (typeof reqBody.message === 'string' && latestUserIndex >= 0) {
+    messages[latestUserIndex].content = sanitizeString(reqBody.message);
+  }
+
+  if (messages.some((message) => message.content.length > MAX_MESSAGE_LENGTH)) {
+    const error = new Error('Un message dépasse la taille maximale autorisée.');
+    error.statusCode = 413;
+    throw error;
+  }
+
+  const header = (name) => reqHeaders[name] || reqHeaders[name.toLowerCase()];
   const keys = {
-    groq: reqBody.groqKey || reqHeaders['x-groq-key'] || process.env.GROQ_API_KEY,
-    openrouter: reqBody.openrouterKey || reqHeaders['x-openrouter-key'] || process.env.OPENROUTER_API_KEY,
-    gemini: reqBody.geminiKey || reqHeaders['x-gemini-key'] || process.env.GEMINI_API_KEY,
-    github: reqBody.githubKey || reqHeaders['x-github-key'] || process.env.GITHUB_TOKEN,
-    huggingface: reqBody.hfKey || reqHeaders['x-hf-key'] || process.env.HUGGING_FACE_API_KEY
+    groq: reqBody.groqKey || header('x-groq-key') || process.env.GROQ_API_KEY,
+    openrouter: reqBody.openrouterKey || header('x-openrouter-key') || process.env.OPENROUTER_API_KEY,
+    gemini: reqBody.geminiKey || header('x-gemini-key') || process.env.GEMINI_API_KEY,
+    github: reqBody.githubKey || header('x-github-key') || process.env.GITHUB_TOKEN,
+    huggingface: reqBody.hfKey || header('x-hf-key') || process.env.HUGGINGFACE_API_KEY || process.env.HUGGING_FACE_API_KEY
   };
 
   if (!keys.groq) {
-    throw new Error("[Security] Accès refusé : Clé API Groq obligatoire pour faire fonctionner le routeur central.");
+    const error = new Error('La variable serveur GROQ_API_KEY est requise pour le chat.');
+    error.statusCode = 503;
+    throw error;
   }
 
-  // 4. Nettoyage des messages de l'utilisateur contre les injections de prompts grossières
-  const sanitizedMessages = reqBody.messages.map(msg => ({
-    role: msg.role === 'user' || msg.role === 'assistant' ? msg.role : 'user',
-    content: sanitizeString(msg.content || '')
-  }));
-
+  const sessionId = sanitizeString(reqBody.sessionId || 'default-session').slice(0, 128) || 'default-session';
   return {
     isValid: true,
     sessionId,
-    messages: sanitizedMessages,
-    hasImage: Boolean(reqBody.hasImage),
+    messages,
+    hasImage: Boolean(reqBody.hasImage || reqBody.file?.type?.startsWith('image/')),
+    mode: ALLOWED_MODES.has(reqBody.mode) ? reqBody.mode : 'standard',
+    webSearch: Boolean(reqBody.webSearch),
     keys
   };
 }
 
-function sanitizeString(str) {
-  if (typeof str !== 'string') return '';
-  // Nettoyage basique des caractères de contrôle indésirables tout en préservant le code et le texte normal
-  return str.trim().replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
+function sanitizeString(value) {
+  if (typeof value !== 'string') return '';
+  // Préserve les retours à la ligne et tabulations (essentiels au code joint).
+  return value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '').trim();
 }
 
 module.exports = { validateAndSanitizeRequest };
-    

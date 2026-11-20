@@ -1,5 +1,5 @@
 // api/core/octopusCore.js
-// Cœur central d'orchestration complet d'Octopus2
+// Orchestration de la conversation Octopus2.
 
 const { validateAndSanitizeRequest } = require('../lib/securityLayer.js');
 const { planRequest } = require('../lib/planner.js');
@@ -8,53 +8,54 @@ const { reviewAndRefineResponse } = require('../lib/reviewer.js');
 const { getChatHistory, saveChatMessage } = require('../lib/jsonbin.js');
 const { loadLongTermMemory } = require('../lib/longTermMemory.js');
 
-async function handleOctopusCore(rawReqBody, rawHeaders) {
-  // 1. Passage par la couche de sécurité et de nettoyage
-  const secureData = validateAndSanitizeRequest(rawReqBody, rawHeaders);
-  const { sessionId, messages, hasImage, keys } = secureData;
+async function handleOctopusCore(rawReqBody, rawHeaders = {}) {
+  const { sessionId, messages, hasImage, mode, keys } = validateAndSanitizeRequest(rawReqBody, rawHeaders);
+  const latestUserMessage = [...messages].reverse().find((message) => message.role === 'user')?.content || '';
 
-  const userLatestMessage = messages[messages.length - 1].content;
+  // Les services de mémoire sont facultatifs : leur panne ne doit pas bloquer le chat.
+  const [historyResult, memoryResult] = await Promise.allSettled([
+    getChatHistory(sessionId),
+    loadLongTermMemory()
+  ]);
+  const historySummary = historyResult.status === 'fulfilled' ? historyResult.value : '';
+  const memoryContext = memoryResult.status === 'fulfilled' ? memoryResult.value : '';
 
-  // 2. Récupération de l'historique (JSONBin) et de la mémoire à long terme
-  const historySummary = await getChatHistory(sessionId);
-  const memoryContext = await loadLongTermMemory();
+  const plan = await planRequest(latestUserMessage, historySummary, hasImage, keys.groq);
+  const globalContextData = [
+    memoryContext ? `Mémoire globale du projet : ${memoryContext}` : '',
+    historySummary ? `Historique récent :\n${historySummary}` : ''
+  ].filter(Boolean).join('\n\n');
 
-  // 3. Étape du Routeur IA (Planner) : Choix de l'agent et du modèle
-  const plan = await planRequest(userLatestMessage, historySummary, hasImage, keys.groq);
-
-  // 4. Constitution du contexte global pour l'agent
-  const globalContextData = `Mémoire globale du projet: ${JSON.stringify(memoryContext)}\n\nHistorique récent:\n${historySummary}`;
-
-  // 5. Exécution par l'Agent Spécialisé correspondant
   const executionResult = await runSpecializedAgent({
     plan,
     messages,
     contextData: globalContextData,
+    mode,
     keys
   });
 
-  // 6. Étape de relecture et de validation par le Reviewer (si code ou GitHub)
   const finalResponseText = await reviewAndRefineResponse(
-    plan.agent, 
-    executionResult.response, 
-    userLatestMessage, 
+    plan.agent,
+    executionResult.response,
+    latestUserMessage,
     keys.groq
   );
 
-  // 7. Sauvegarde automatique de l'échange dans la mémoire JSONBin
-  await saveChatMessage(sessionId, { role: 'user', content: userLatestMessage });
-  await saveChatMessage(sessionId, { role: 'assistant', content: finalResponseText });
+  // JSONBin est optionnel; ne transforme pas une réponse réussie en erreur API.
+  await Promise.allSettled([
+    saveChatMessage(sessionId, { role: 'user', content: latestUserMessage }),
+    saveChatMessage(sessionId, { role: 'assistant', content: finalResponseText })
+  ]);
 
   return {
     response: finalResponseText,
     metadata: {
       agentUsed: plan.agent,
-      modelUsed: executionResult.usedModel,
-      activeProject: plan.activeProject,
-      reasoning: plan.reasoning
+      modelUsed: executionResult.usedModel?.modelName || executionResult.usedModel || 'unknown',
+      activeProject: plan.activeProject || 'none',
+      reasoning: plan.reasoning || ''
     }
   };
 }
 
 module.exports = { handleOctopusCore };
-    
