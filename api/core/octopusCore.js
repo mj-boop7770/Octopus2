@@ -9,39 +9,33 @@ const { getChatHistory, saveChatMessage } = require('../lib/jsonbin.js');
 const { loadLongTermMemory } = require('../lib/longTermMemory.js');
 
 async function handleOctopusCore(rawReqBody, rawHeaders) {
-  // 1. Passage par la couche de sécurité et de nettoyage
   const secureData = validateAndSanitizeRequest(rawReqBody, rawHeaders);
-  const { sessionId, messages, hasImage, keys } = secureData;
-
+  const { sessionId, messages, hasImage, mode, file, keys } = secureData;
   const userLatestMessage = messages[messages.length - 1].content;
 
-  // 2. Récupération de l'historique (JSONBin) et de la mémoire à long terme
   const historySummary = await getChatHistory(sessionId);
   const memoryContext = await loadLongTermMemory();
-
-  // 3. Étape du Routeur IA (Planner) : Choix de l'agent et du modèle
   const plan = await planRequest(userLatestMessage, historySummary, hasImage, keys.groq);
 
-  // 4. Constitution du contexte global pour l'agent
-  const globalContextData = `Mémoire globale du projet: ${JSON.stringify(memoryContext)}\n\nHistorique récent:\n${historySummary}`;
+  let selectedMode = mode;
+  if (plan.agent === 'code') selectedMode = 'coder';
+  else if (plan.agent === 'debug') selectedMode = 'coder';
+  else if (mode === 'creative') selectedMode = 'creative';
+  else if (mode === 'concise') selectedMode = 'concise';
+  else selectedMode = 'standard';
 
-  // 5. Exécution par l'Agent Spécialisé correspondant
+  const globalContextData = `Mémoire globale du projet: ${JSON.stringify(memoryContext)}\n\nHistorique récent:\n${historySummary}`;
   const executionResult = await runSpecializedAgent({
     plan,
     messages,
     contextData: globalContextData,
+    mode: selectedMode,
+    file,
     keys
   });
 
-  // 6. Étape de relecture et de validation par le Reviewer (si code ou GitHub)
-  const finalResponseText = await reviewAndRefineResponse(
-    plan.agent, 
-    executionResult.response, 
-    userLatestMessage, 
-    keys.groq
-  );
+  const finalResponseText = await reviewAndRefineResponse(plan.agent, executionResult.response, userLatestMessage, keys.groq);
 
-  // 7. Sauvegarde automatique de l'échange dans la mémoire JSONBin
   await saveChatMessage(sessionId, { role: 'user', content: userLatestMessage });
   await saveChatMessage(sessionId, { role: 'assistant', content: finalResponseText });
 
@@ -57,4 +51,3 @@ async function handleOctopusCore(rawReqBody, rawHeaders) {
 }
 
 module.exports = { handleOctopusCore };
-    
