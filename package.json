@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "check": "node --check api/chat.js && node --check api/music.js && node --check api/core/octopusCore.js && node --check api/lib/securityLayer.js"
+    "check": "node --check server.js && node --check api/chat.js && node --check api/music.js && node --check api/core/octopusCore.js && node --check api/lib/securityLayer.js"
   },
   "dependencies": {},
   "engines": {
