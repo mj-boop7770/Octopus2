@@ -1,126 +1,76 @@
 // api/lib/specializedAgents.js
 const { getProjectMemory } = require('./memory.js');
+const { chatCompletion, geminiChat, parseDataUrl } = require('./llm.js');
+const { getModel, BRAIN_ID, FAST_ID } = require('./modelRegistry.js');
 
-class SpecializedAgentsManager {
-    constructor() {
-        this.agents = {
-            coder: {
-                name: 'DevPro',
-                systemPrompt: `Vous êtes DevPro, un expert en développement logiciel, architecture web, et debugging. Vous donnez des réponses précises, du code propre, bien structuré et optimisé.`
-            },
-            creative: {
-                name: 'Muse',
-                systemPrompt: `Vous êtes Muse, un assistant créatif, poétique, captivant et inspirant.`
-            },
-            concise: {
-                name: 'Flash',
-                systemPrompt: `Vous êtes Flash. Soyez ultra-concis, direct, clair et synthétique.`
-            },
-            standard: {
-                name: 'Octopus',
-                systemPrompt: `Vous êtes MUJOS-OCTOPUS2, un assistant IA polyvalent, intelligent, courtois et efficace.`
-            }
-        };
-    }
+const AGENT_PROMPTS = {
+  coder: `Vous êtes DevPro, un expert en développement logiciel, architecture web, et debugging. Vous donnez des réponses précises, du code propre, bien structuré et optimisé.`,
+  creative: `Vous êtes Muse, un assistant créatif, poétique, captivant et inspirant.`,
+  concise: `Vous êtes Flash. Soyez ultra-concis, direct, clair et synthétique.`,
+  standard: `Vous êtes MUJOS-OCTOPUS2, un assistant IA polyvalent, intelligent, courtois et efficace.`
+};
 
-    getAgentPrompt(mode) {
-        const agent = this.agents[mode] || this.agents.standard;
-        return agent.systemPrompt;
-    }
+function buildMessages(mode, messages, contextData) {
+  let system = AGENT_PROMPTS[mode] || AGENT_PROMPTS.standard;
+  try {
+    const projectMemory = getProjectMemory();
+    if (projectMemory) system += `\n\n${projectMemory}`;
+  } catch (e) { /* mémoire projet facultative */ }
 
-    async processWithAgent(mode, userPrompt, contextMessages = [], fileData = null) {
-        const systemPrompt = this.getAgentPrompt(mode);
-        
-        // Récupération sécurisée du contexte projet CommonJS
-        let memContext = "";
-        try {
-            memContext = getProjectMemory ? getProjectMemory() : "";
-        } catch (e) {
-            memContext = "";
-        }
+  if (contextData) system += `\n\n[DONNÉES DU CONTEXTE]:\n${contextData}`;
 
-        let finalSystemPrompt = systemPrompt;
-        if (memContext) {
-            finalSystemPrompt += `\n\n${memContext}`;
-        }
-
-        const messages = [
-            { role: 'system', content: finalSystemPrompt },
-            ...contextMessages
-        ];
-
-        if (fileData && fileData.text) {
-            messages.push({
-                role: 'user',
-                content: `${userPrompt}\n\n[FICHIER JOINT (${fileData.name})]:\n${fileData.text}`
-            });
-        } else {
-            messages.push({ role: 'user', content: userPrompt });
-        }
-
-        return messages;
-    }
+  return [{ role: 'system', content: system }, ...messages];
 }
 
-const managerInstance = new SpecializedAgentsManager();
+async function callModel(model, formattedMessages, keys, image) {
+  if (model.provider === 'gemini') {
+    return geminiChat({ apiKey: keys.gemini, model: model.modelName, messages: formattedMessages, image });
+  }
+  return chatCompletion({
+    provider: model.provider,
+    apiKey: keys[model.provider], // chaque fournisseur a SA clé, aucun mélange
+    model: model.modelName,
+    messages: formattedMessages
+  });
+}
 
-async function runSpecializedAgent({ plan, messages, contextData, mode, image, keys }) {
-    const lastUserMessage = messages[messages.length - 1]?.content || "";
-    const formattedMessages = await managerInstance.processWithAgent(mode, lastUserMessage, messages.slice(0, -1));
+function toHttpError(model, error) {
+  let message = `Le modèle « ${model.modelName} » (${model.provider}) n'a pas pu répondre : ${error.message}`;
+  if (error.providerStatus === 401 || error.providerStatus === 403) {
+    message = `Clé ${model.provider} refusée par le fournisseur. Vérifie la variable d'environnement correspondante.`;
+  } else if (error.providerStatus === 429) {
+    message = `Limite d'utilisation du plan gratuit ${model.provider} atteinte. Réessaie dans un moment.`;
+  }
+  const wrapped = new Error(message);
+  wrapped.statusCode = 502;
+  return wrapped;
+}
 
-    if (contextData) {
-        formattedMessages.unshift({ role: 'system', content: `[DONNÉES DU CONTEXTE EN TEMPS RÉEL]:\n${contextData}` });
-    }
+async function runSpecializedAgent({ plan, messages, contextData, mode, file, keys }) {
+  const formattedMessages = buildMessages(mode, messages, contextData);
+  const model = plan.selectedModel;
+  const image = file && file.type && file.type.startsWith('image/') ? parseDataUrl(file.data) : null;
 
-    // Utilisation du modèle sélectionné par le planner si disponible, ou fallback sur groq/openrouter/gemini
-    const activeApiKey = keys.groq || keys.openrouter || keys.gemini;
-    if (!activeApiKey) {
-        return {
-            response: "Clé API non disponible sur le serveur Vercel.",
-            usedModel: plan.selectedModel
-        };
-    }
+  try {
+    const response = await callModel(model, formattedMessages, keys, image && model.provider === 'gemini' ? image : null);
+    return { response: response || 'Aucune réponse générée.', usedModel: model.id };
+  } catch (error) {
+    console.error(`[Agent] ${model.id} a échoué :`, error.message);
 
-    // Détermination dynamique du modèle et de l'endpoint en fonction du plan du Planner
-    let apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
-    let apiKeyToUse = keys.groq;
-    let modelName = plan?.selectedModel?.modelName || 'llama-3.1-8b-instant';
+    // Repli sur un modèle Groq si le modèle choisi (OpenRouter, ...) est en panne.
+    // Pas de repli pour Gemini : un modèle texte ne peut pas lire l'image.
+    const canFallback = model.provider !== 'groq' && model.provider !== 'gemini' && keys.groq;
+    if (!canFallback) throw toHttpError(model, error);
 
-    if (plan?.selectedModel?.provider === 'openrouter') {
-        apiUrl = 'https://openrouter.ai/api/v1/chat/completions';
-        apiKeyToUse = keys.openrouter || keys.groq;
-    }
-
+    const fallback = getModel(BRAIN_ID) || getModel(FAST_ID);
     try {
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${apiKeyToUse}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                model: modelName,
-                messages: formattedMessages,
-                temperature: 0.7
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error(`Erreur API Provider: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        return {
-            response: data.choices?.[0]?.message?.content || "Aucune réponse générée.",
-            usedModel: plan.selectedModel
-        };
-    } catch (err) {
-        return {
-            response: `Erreur lors de l'exécution de l'agent: ${err.message}`,
-            usedModel: plan.selectedModel
-        };
+      const response = await callModel(fallback, formattedMessages, keys, null);
+      return { response: response || 'Aucune réponse générée.', usedModel: `${fallback.id} (repli)` };
+    } catch (fallbackError) {
+      console.error(`[Agent] Repli ${fallback.id} a échoué :`, fallbackError.message);
+      throw toHttpError(fallback, fallbackError);
     }
+  }
 }
 
 module.exports = { runSpecializedAgent };
-            
