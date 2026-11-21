@@ -5,8 +5,42 @@ const { validateAndSanitizeRequest } = require('../lib/securityLayer.js');
 const { planRequest, pickModel } = require('../lib/planner.js');
 const { runSpecializedAgent } = require('../lib/specializedAgents.js');
 const { reviewAndRefineResponse } = require('../lib/reviewer.js');
-const { getChatHistory, saveChatMessage } = require('../lib/jsonbin.js');
-const { loadLongTermMemory } = require('../lib/longTermMemory.js');
+const jsonbin = require('../lib/jsonbin.js');
+const longTermMemory = require('../lib/longTermMemory.js');
+
+// La mémoire et l'historique serveur sont FACULTATIFS : si un module est absent, différent
+// ou en panne, le chat doit quand même répondre (on continue sans).
+async function safeLoadMemory() {
+  const load = longTermMemory.loadLongTermMemory || longTermMemory.getLongTermMemory;
+  if (typeof load !== 'function') return '';
+  try {
+    const result = await load();
+    return typeof result === 'string' ? result : '';
+  } catch (error) {
+    console.error('[Mémoire] Ignorée :', error.message);
+    return '';
+  }
+}
+
+async function safeGetHistory(sessionId) {
+  if (typeof jsonbin.getChatHistory !== 'function') return '';
+  try {
+    const result = await jsonbin.getChatHistory(sessionId);
+    return typeof result === 'string' ? result : '';
+  } catch (error) {
+    console.error('[Historique] Ignoré :', error.message);
+    return '';
+  }
+}
+
+async function safeSaveMessage(sessionId, message) {
+  if (typeof jsonbin.saveChatMessage !== 'function') return;
+  try {
+    await jsonbin.saveChatMessage(sessionId, message);
+  } catch (error) {
+    console.error('[Historique] Sauvegarde ignorée :', error.message);
+  }
+}
 
 async function handleOctopusCore(rawReqBody, rawHeaders) {
   const secureData = validateAndSanitizeRequest(rawReqBody, rawHeaders);
@@ -30,8 +64,8 @@ async function handleOctopusCore(rawReqBody, rawHeaders) {
   // + sessionId). Si le client envoie déjà l'historique complet, on évite le doublon et
   // les allers-retours JSONBin (latence, écritures concurrentes).
   const useServerHistory = Boolean(sessionId) && !clientHasHistory;
-  const historySummary = useServerHistory ? await getChatHistory(sessionId) : '';
-  const memoryContext = await loadLongTermMemory();
+  const historySummary = useServerHistory ? await safeGetHistory(sessionId) : '';
+  const memoryContext = await safeLoadMemory();
 
   const plan = await planRequest(userLatestMessage, historySummary, hasImage, keys);
 
@@ -62,8 +96,8 @@ async function handleOctopusCore(rawReqBody, rawHeaders) {
   const finalResponseText = await reviewAndRefineResponse(plan.agent, executionResult.response, userLatestMessage, keys.groq);
 
   if (useServerHistory) {
-    await saveChatMessage(sessionId, { role: 'user', content: userLatestMessage });
-    await saveChatMessage(sessionId, { role: 'assistant', content: finalResponseText });
+    await safeSaveMessage(sessionId, { role: 'user', content: userLatestMessage });
+    await safeSaveMessage(sessionId, { role: 'assistant', content: finalResponseText });
   }
 
   return {
