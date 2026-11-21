@@ -6,21 +6,8 @@ const { planRequest, pickModel } = require('../lib/planner.js');
 const { runSpecializedAgent } = require('../lib/specializedAgents.js');
 const { reviewAndRefineResponse } = require('../lib/reviewer.js');
 const jsonbin = require('../lib/jsonbin.js');
-const longTermMemory = require('../lib/longTermMemory.js');
 
-// La mémoire et l'historique serveur sont FACULTATIFS : si un module est absent, différent
-// ou en panne, le chat doit quand même répondre (on continue sans).
-async function safeLoadMemory() {
-  const load = longTermMemory.loadLongTermMemory || longTermMemory.getLongTermMemory;
-  if (typeof load !== 'function') return '';
-  try {
-    const result = await load();
-    return typeof result === 'string' ? result : '';
-  } catch (error) {
-    console.error('[Mémoire] Ignorée :', error.message);
-    return '';
-  }
-}
+// L'historique serveur est FACULTATIF : s'il est en panne, le chat répond quand même.
 
 async function safeGetHistory(sessionId) {
   if (typeof jsonbin.getChatHistory !== 'function') return '';
@@ -65,7 +52,6 @@ async function handleOctopusCore(rawReqBody, rawHeaders) {
   // les allers-retours JSONBin (latence, écritures concurrentes).
   const useServerHistory = Boolean(sessionId) && !clientHasHistory;
   const historySummary = useServerHistory ? await safeGetHistory(sessionId) : '';
-  const memoryContext = await safeLoadMemory();
 
   const plan = await planRequest(userLatestMessage, historySummary, hasImage, keys);
 
@@ -81,7 +67,6 @@ async function handleOctopusCore(rawReqBody, rawHeaders) {
   else if (mode === 'concise') selectedMode = 'concise';
 
   const contextParts = [];
-  if (memoryContext) contextParts.push(`Mémoire globale du projet:${memoryContext}`);
   if (historySummary) contextParts.push(`Historique récent:\n${historySummary}`);
 
   const executionResult = await runSpecializedAgent({
