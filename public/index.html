@@ -187,7 +187,8 @@
         // Assainit le HTML venant du markdown (anti-XSS). Si DOMPurify n'a pas chargé : texte brut échappé.
         const safeHtml = (html) => window.DOMPurify ? DOMPurify.sanitize(html) : escapeHtml(html);
 
-        // Identifiant de session aléatoire, propre à chaque discussion        function newSessionId() {
+        // Identifiant de session aléatoire, propre à chaque discussion
+        function newSessionId() {
             try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
             return 'sid-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
         }
@@ -375,7 +376,9 @@
             if (!currentChatId) createNewChat(); else { renderSidebar(); renderMessages(); }
         };
 
-        newChatBtn.onclick = createNewChat;        function renderMessages() {
+        newChatBtn.onclick = createNewChat;
+
+        function renderMessages() {
             messagesContainer.innerHTML = '';
             const activeChat = chats.find(c => c.id === currentChatId);
             if (!activeChat) return;
