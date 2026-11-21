@@ -12,6 +12,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <!-- Marked -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/11.0.0/marked.min.js"></script>
+    <!-- DOMPurify : assainit le HTML produit par le markdown -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -108,7 +110,7 @@
                 <label for="file-input" class="text-slate-500 hover:text-indigo-400 transition p-2 text-sm cursor-pointer active:scale-95 flex items-center justify-center" title="Joindre une image ou un fichier">
                     <i class="fa-solid fa-paperclip"></i>
                 </label>
-                <input type="file" id="file-input" class="hidden" accept="image/*, application/pdf, text/plain, text/javascript, text/css, text/html, application/json">
+                <input type="file" id="file-input" class="hidden" accept="image/*, text/plain, text/javascript, text/css, text/html, application/json, .md">
 
                 <!-- BOUTON MICRO -->
                 <button id="mic-btn" type="button" class="text-slate-500 hover:text-indigo-400 transition p-2 text-sm active:scale-95" title="Dictée vocale">
@@ -141,7 +143,7 @@
                 <div class="relative group my-4 rounded-xl overflow-hidden border border-slate-800 bg-slate-900 shadow-lg">
                     <div class="flex items-center justify-between px-4 py-2 bg-slate-800 text-[11px] text-slate-400 font-mono border-b border-slate-700/50">
                         <span class="uppercase">${validLang}</span>
-                        <button onclick="copyCode('${codeId}', this)" class="hover:text-white transition flex items-center gap-1.5">
+                        <button type="button" data-copy-target="${codeId}" class="hover:text-white transition flex items-center gap-1.5">
                             <i class="fa-regular fa-copy"></i> <span class="copy-text">Copier</span>
                         </button>
                     </div>
@@ -173,10 +175,22 @@
         };
 
         // État Global
-        let chats = JSON.parse(localStorage.getItem('octopus_chats')) || [];
+        let chats = [];
+        try {
+            const stored = JSON.parse(localStorage.getItem('octopus_chats'));
+            if (Array.isArray(stored)) chats = stored;
+        } catch (e) { chats = []; }
         let currentChatId = null;
         let isWebSearchActive = false;
         let selectedFileData = null;
+
+        // Assainit le HTML venant du markdown (anti-XSS). Si DOMPurify n'a pas chargé : texte brut échappé.
+        const safeHtml = (html) => window.DOMPurify ? DOMPurify.sanitize(html) : escapeHtml(html);
+
+        // Identifiant de session aléatoire, propre à chaque discussion        function newSessionId() {
+            try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
+            return 'sid-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+        }
 
         // Éléments DOM
         const sidebar = document.getElementById('sidebar');
@@ -197,6 +211,11 @@
         const filePreviewContainer = document.getElementById('file-preview-container');
         const filePreviewContent = document.getElementById('file-preview-content');
         const removeFileBtn = document.getElementById('remove-file-btn');
+
+        messagesContainer.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-copy-target]');
+            if (btn) window.copyCode(btn.getAttribute('data-copy-target'), btn);
+        });
 
         // Dictée vocale
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -221,45 +240,64 @@
             };
         }
 
-        // GESTION CORRIGÉE DE L'IMPORTATION DE FICHIERS (TEXTE, PHOTOS, DOCUMENTS)
-        fileInput.addEventListener('change', (e) => {
+        // IMPORTATION DE FICHIERS : texte/code (lus en clair) et images (réduites avant envoi)
+        const MAX_TEXT_BYTES = 25 * 1024;
+
+        function showFilePreview(iconClass, label) {
+            filePreviewContent.innerHTML = `<i class="fa-solid ${iconClass} text-indigo-400"></i> <span class="truncate max-w-xs">${escapeHtml(label)}</span>`;
+            filePreviewContainer.classList.remove('hidden');
+        }
+
+        function rejectFile(message) {
+            selectedFileData = null;
+            fileInput.value = '';
+            filePreviewContainer.classList.add('hidden');
+            alert(message);
+        }
+
+        // Réduit l'image (1280 px max, JPEG) : évite de saturer localStorage et la limite de taille de l'API
+        function shrinkImage(file) {
+            return new Promise((resolve, reject) => {
+                const url = URL.createObjectURL(file);
+                const img = new Image();
+                img.onload = () => {
+                    const scale = Math.min(1, 1280 / Math.max(img.width, img.height));
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.round(img.width * scale);
+                    canvas.height = Math.round(img.height * scale);
+                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                    URL.revokeObjectURL(url);
+                    resolve(canvas.toDataURL('image/jpeg', 0.8));
+                };
+                img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image illisible')); };
+                img.src = url;
+            });
+        }
+
+        fileInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
 
-            const isTextFile = file.type.startsWith('text/') || 
-                               file.name.endsWith('.txt') || 
-                               file.name.endsWith('.js') || 
-                               file.name.endsWith('.json') || 
-                               file.name.endsWith('.html') || 
-                               file.name.endsWith('.css') || 
-                               file.name.endsWith('.md');
+            const isTextFile = file.type.startsWith('text/') ||
+                               /\.(txt|js|json|html|css|md)$/i.test(file.name);
 
             if (isTextFile) {
+                if (file.size > MAX_TEXT_BYTES) return rejectFile('Fichier texte trop volumineux (25 Ko maximum).');
                 const reader = new FileReader();
-                reader.onload = function(evt) {
-                    selectedFileData = {
-                        name: file.name,
-                        type: 'text/plain',
-                        text: evt.target.result,
-                        data: 'data:text/plain;base64,' + btoa(unescape(encodeURIComponent(evt.target.result)))
-                    };
-                    filePreviewContent.innerHTML = `<i class="fa-solid fa-file-lines text-indigo-400"></i> <span class="truncate max-w-xs">${file.name} (${Math.round(file.size/1024)} KB)</span>`;
-                    filePreviewContainer.classList.remove('hidden');
+                reader.onload = (evt) => {
+                    selectedFileData = { name: file.name, type: 'text/plain', text: evt.target.result };
+                    showFilePreview('fa-file-lines', `${file.name} (${Math.max(1, Math.round(file.size / 1024))} Ko)`);
                 };
                 reader.readAsText(file);
+            } else if (file.type.startsWith('image/')) {
+                try {
+                    selectedFileData = { name: file.name, type: 'image/jpeg', data: await shrinkImage(file) };
+                    showFilePreview('fa-image', file.name);
+                } catch (err) {
+                    rejectFile('Impossible de lire cette image.');
+                }
             } else {
-                const reader = new FileReader();
-                reader.onload = function(evt) {
-                    selectedFileData = {
-                        name: file.name,
-                        type: file.type || 'application/octet-stream',
-                        data: evt.target.result
-                    };
-                    const iconClass = file.type.startsWith('image/') ? 'fa-image' : 'fa-file';
-                    filePreviewContent.innerHTML = `<i class="fa-solid ${iconClass} text-indigo-400"></i> <span class="truncate max-w-xs">${file.name}</span>`;
-                    filePreviewContainer.classList.remove('hidden');
-                };
-                reader.readAsDataURL(file);
+                rejectFile('Type de fichier non pris en charge : utilise un fichier texte/code ou une image.');
             }
         });
 
@@ -287,10 +325,18 @@
         };
 
         // Gestion des chats
-        function saveChats() { localStorage.setItem('octopus_chats', JSON.stringify(chats)); }
+        function saveChats() {
+            // Les blob: URL audio ne survivent pas à un rechargement : on ne les stocke pas
+            const serialize = () => JSON.stringify(chats, (key, value) => key === 'audioUrl' ? undefined : value);
+            try { localStorage.setItem('octopus_chats', serialize()); return; } catch (e) { /* quota plein */ }
+            // Quota plein : on retire les images stockées puis on réessaie
+            chats.forEach(c => c.messages.forEach(m => { if (m.file && m.file.data) delete m.file.data; }));
+            try { localStorage.setItem('octopus_chats', serialize()); }
+            catch (e) { console.warn('Sauvegarde locale impossible :', e.message); }
+        }
 
         function createNewChat() {
-            const newChat = { id: Date.now().toString(), title: 'Nouvelle discussion', messages: [] };
+            const newChat = { id: Date.now().toString(), sid: newSessionId(), title: 'Nouvelle discussion', messages: [] };
             chats.unshift(newChat);
             currentChatId = newChat.id;
             saveChats();
@@ -307,7 +353,7 @@
                 btn.innerHTML = `
                     <div class="flex items-center gap-2 truncate">
                         <i class="fa-regular fa-message text-slate-500"></i>
-                        <span class="truncate">${chat.title}</span>
+                        <span class="truncate">${escapeHtml(chat.title)}</span>
                     </div>
                     <button onclick="deleteChat(event, '${chat.id}')" class="text-slate-500 hover:text-red-400 p-1"><i class="fa-solid fa-trash"></i></button>`;
                 btn.onclick = (e) => {
@@ -329,9 +375,7 @@
             if (!currentChatId) createNewChat(); else { renderSidebar(); renderMessages(); }
         };
 
-        newChatBtn.onclick = createNewChat;
-
-        function renderMessages() {
+        newChatBtn.onclick = createNewChat;        function renderMessages() {
             messagesContainer.innerHTML = '';
             const activeChat = chats.find(c => c.id === currentChatId);
             if (!activeChat) return;
@@ -344,13 +388,14 @@
                 msgDiv.className = `flex gap-3 max-w-3xl ${isUser ? 'ml-auto flex-row-reverse' : 'mr-auto'}`;
                 
                 let fileHtml = '';
+                const textContent = (msg.isAudio && !msg.audioUrl) ? '🎵 Morceau généré (non conservé après rechargement : relance la génération pour le réécouter).' : msg.content;
                 if (msg.file) {
-                    if (msg.file.type && msg.file.type.startsWith('image/')) {
+                    if (msg.file.type && msg.file.type.startsWith('image/') && msg.file.data) {
                         fileHtml = `<img src="${msg.file.data}" class="max-w-xs rounded-lg my-2 border border-slate-700 shadow" />`;
                     } else if (msg.file.text) {
-                        fileHtml = `<div class="text-xs bg-slate-800/80 border border-slate-700 p-2.5 rounded-lg my-1 font-mono text-slate-300 max-h-32 overflow-y-auto custom-scrollbar"><i class="fa-solid fa-file-lines text-indigo-400"></i> <b>${msg.file.name}</b><br><pre class="whitespace-pre-wrap mt-1 text-[11px] text-slate-400">${escapeHtml(msg.file.text.slice(0, 300))}${msg.file.text.length > 300 ? '...' : ''}</pre></div>`;
+                        fileHtml = `<div class="text-xs bg-slate-800/80 border border-slate-700 p-2.5 rounded-lg my-1 font-mono text-slate-300 max-h-32 overflow-y-auto custom-scrollbar"><i class="fa-solid fa-file-lines text-indigo-400"></i> <b>${escapeHtml(msg.file.name)}</b><br><pre class="whitespace-pre-wrap mt-1 text-[11px] text-slate-400">${escapeHtml(msg.file.text.slice(0, 300))}${msg.file.text.length > 300 ? '...' : ''}</pre></div>`;
                     } else {
-                        fileHtml = `<div class="text-xs bg-slate-800 p-2 rounded my-1"><i class="fa-solid fa-paperclip"></i> ${msg.file.name}</div>`;
+                        fileHtml = `<div class="text-xs bg-slate-800 p-2 rounded my-1"><i class="fa-solid fa-paperclip"></i> ${escapeHtml(msg.file.name)}</div>`;
                     }
                 }
 
@@ -381,7 +426,7 @@
                         <div class="space-y-1.5 max-w-[85%]">
                             <div class="p-3.5 rounded-2xl ${isUser ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-slate-900 border border-slate-800 text-slate-200 rounded-tl-none'} shadow-sm">
                                 ${fileHtml}
-                                <div class="markdown-body">${isUser ? escapeHtml(msg.content) : marked.parse(msg.content)}</div>
+                                <div class="markdown-body">${isUser ? escapeHtml(textContent) : safeHtml(marked.parse(textContent))}</div>
                             </div>
                         </div>`;
                 }
@@ -403,12 +448,13 @@
 
             if (!currentChatId) createNewChat();
             const activeChat = chats.find(c => c.id === currentChatId);
+            if (!activeChat.sid) activeChat.sid = newSessionId();
 
             if (activeChat.messages.length === 0) {
                 activeChat.title = rawText ? rawText.slice(0, 25) + '...' : (selectedFileData ? selectedFileData.name : 'Fichier joint');
             }
 
-            let fullTextPrompt = rawText;
+            let fullTextPrompt = rawText || 'Analyse ce fichier joint.';
             if (selectedFileData && selectedFileData.text) {
                 fullTextPrompt += `\n\n[CONTENU DU FICHIER "${selectedFileData.name}"]:\n${selectedFileData.text}`;
             }
@@ -450,20 +496,23 @@
                         const audioUrl = URL.createObjectURL(blob);
                         activeChat.messages.push({ role: 'bot', content: 'Génération musicale terminée.', isAudio: true, audioUrl: audioUrl });
                     } else {
-                        const errText = await musicRes.text();
+                        let errText = '';
+                        try { errText = (await musicRes.json()).error; } catch (e) {}
                         activeChat.messages.push({ role: 'bot', content: `⚠️ Erreur Musique: ${errText || 'Impossible de générer le morceau.'}` });
                     }
                 } else {
-                    const cleanMessagesHistory = activeChat.messages.map(m => ({
+                    // On n'envoie ni les erreurs ni les messages audio ; le dernier message contient le texte du fichier joint
+                    const historyToSend = activeChat.messages.filter(m => !(m.role === 'bot' && (m.isAudio || String(m.content).startsWith('⚠️'))));
+                    const cleanMessagesHistory = historyToSend.map((m, i, arr) => ({
                         role: m.role === 'bot' ? 'assistant' : 'user',
-                        content: m.content
+                        content: i === arr.length - 1 ? fullTextPrompt : m.content
                     }));
 
                     const response = await fetch('/api/chat', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            message: fullTextPrompt,
+                            sessionId: activeChat.sid,
                             messages: cleanMessagesHistory,
                             mode: modeSelect.value,
                             webSearch: isWebSearchActive,
@@ -471,13 +520,13 @@
                         })
                     });
 
-                    const data = await response.json();
+                    const data = await response.json().catch(() => ({}));
                     loadingDiv.remove();
 
                     if (response.ok && data.reply) {
                         activeChat.messages.push({ role: 'bot', content: data.reply });
                     } else {
-                        activeChat.messages.push({ role: 'bot', content: `⚠️ Erreur API : ${data.error || data.message || 'Erreur inconnue'}` });
+                        activeChat.messages.push({ role: 'bot', content: `⚠️ Erreur API : ${data.error || data.message || ('Erreur HTTP ' + response.status)}` });
                     }
                 }
             } catch (err) {
