@@ -1,90 +1,95 @@
 // api/lib/planner.js
-const { MODEL_REGISTRY } = require('./modelRegistry.js');
+// Le planner (petit modèle Groq) décide de l'AGENT (general / code / debug).
+// Le choix du MODÈLE est ensuite fait en code (pickModel), selon les clés disponibles :
+// c'est plus fiable que de demander à un petit modèle de choisir un identifiant.
 
-const FALLBACK_MODEL = MODEL_REGISTRY.find(m => m.id === 'groq-planner-fast') || MODEL_REGISTRY[0];
+const { FAST_ID, BRAIN_ID, getModel } = require('./modelRegistry.js');
+const { chatCompletion } = require('./llm.js');
 
-async function planRequest(userMessage, historySummary = "", hasImage = false, groqApiKey) {
-  if (!groqApiKey) {
-    return {
-      selectedModel: FALLBACK_MODEL,
-      agent: 'general',
-      activeProject: 'none',
-      needsWebSearch: false,
-      reasoning: 'Fallback sans clé API'
-    };
+const AGENTS = ['general', 'code', 'debug'];
+
+function pickModel({ agent, hasImage, keys, llmPick }) {
+  if (hasImage && keys.gemini) return getModel('gemini-multimodal');
+  if (agent === 'code' && keys.openrouter) return getModel('openrouter-qwen-coder');
+  if (agent === 'debug' && keys.openrouter) return getModel('openrouter-deepseek-debug');
+  if (agent === 'code' || agent === 'debug') return getModel(BRAIN_ID);
+
+  const pick = getModel(llmPick);
+  if (pick && pick.provider === 'groq') return pick;
+  return getModel(FAST_ID);
+}
+
+function parseJson(text) {
+  try { return JSON.parse(text); } catch (e) { /* on tente d'extraire l'objet */ }
+  const match = String(text || '').match(/\{[\s\S]*\}/);
+  if (match) {
+    try { return JSON.parse(match[0]); } catch (e) { /* ignore */ }
   }
+  return {};
+}
 
-  const registryDescription = MODEL_REGISTRY.map(m => 
-    `- ID: "${m.id}" | Modèle: ${m.modelName} | Forces: ${m.strengths.join(', ')} | Cas d'usages: ${m.bestFor.join(', ')}`
-  ).join('\n');
+const SYSTEM_PROMPT = `Tu es le Planner d'Octopus2. Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour.
 
-  const systemPrompt = `Tu es le Planner d'Octopus2. Réponds UNIQUEMENT sous forme d'un objet JSON valide.
+AGENT ("agent") :
+- "general" : discussion, question, salutation, information, rédaction.
+- "code" : UNIQUEMENT si l'utilisateur demande explicitement d'écrire, modifier ou générer du code.
+- "debug" : UNIQUEMENT si l'utilisateur fournit une erreur ou demande de corriger un bug.
 
-CATALOGUE DES IA DISPONIBLES :
-${registryDescription}
+MODÈLE ("selectedModelId") pour l'agent "general" :
+- "${FAST_ID}" : conversation simple, courte ou rapide.
+- "${BRAIN_ID}" : réflexion globale, analyse, tâche lourde.
 
-RÈGLES D'AIGUILLAGE STRICTES :
-1. "general" (Agent) : Pour toute discussion, question, salutation, ou simple phrase d'information.
-2. "code" (Agent) : UNIQUEMENT si l'utilisateur demande EXPLICITEMENT d'écrire, modifier ou générer du code.
-3. "debug" (Agent) : UNIQUEMENT si l'utilisateur fournit une erreur ou demande de corriger un bug technique.
-4. "github" (Agent) : UNIQUEMENT pour une action directe sur le dépôt GitHub.
+FORMAT :
+{"selectedModelId": "${FAST_ID}" ou "${BRAIN_ID}", "agent": "general" | "code" | "debug", "activeProject": "NomDuProjet ou none", "reasoning": "explication courte"}`;
 
-RÈGLES DE SÉLECTION DU MODÈLE (selectedModelId) :
-- Si une image est présente (${hasImage}), choisis "gemini-multimodal".
-- Pour du code explicite ou action GitHub, choisis "openrouter-qwen-coder".
-- Pour du debugging complexe, choisis "openrouter-deepseek-debug".
-- Pour la réflexion globale ou les tâches lourdes, choisis "groq-brain-70b".
-- For les conversations simples ou rapides, choisis "groq-planner-fast".
+function fallbackPlan(reason, hasImage, keys) {
+  return {
+    selectedModel: pickModel({ agent: 'general', hasImage, keys }),
+    agent: 'general',
+    activeProject: 'none',
+    needsWebSearch: false,
+    reasoning: reason
+  };
+}
 
-FORMAT DE SORTIE JSON STRICT :
-{
-  "selectedModelId": "ID_EXACT_DU_CATALOGUE",
-  "agent": "general" | "code" | "debug" | "github",
-  "activeProject": "NomDuProjet ou none",
-  "needsWebSearch": false,
-  "reasoning": "Explication courte"
-}`;
+async function planRequest(userMessage, historySummary = '', hasImage = false, keys = {}) {
+  if (!keys.groq) return fallbackPlan('Fallback sans clé Groq', hasImage, keys);
+
+  const fast = getModel(FAST_ID);
+  const messages = [
+    { role: 'system', content: SYSTEM_PROMPT },
+    {
+      role: 'user',
+      content: `Image jointe : ${hasImage}\nHistorique récent (extrait) : ${String(historySummary).slice(-1500)}\nMessage : "${String(userMessage).slice(0, 2000)}"`
+    }
+  ];
+
+  const base = { provider: 'groq', apiKey: keys.groq, model: fast.modelName, messages, temperature: 0, timeoutMs: 8000 };
 
   try {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${groqApiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Image détectée: ${hasImage}\nHistorique récent: ${historySummary}\nMessage: "${userMessage}"` }
-        ],
-        temperature: 0.0,
-        response_format: { type: "json_object" }
-      })
-    });
-
-    if (!response.ok) {
-      return { selectedModel: FALLBACK_MODEL, agent: 'general', activeProject: 'none', reasoning: 'Erreur HTTP Groq' };
+    let content;
+    try {
+      content = await chatCompletion({ ...base, extra: { response_format: { type: 'json_object' }, reasoning_effort: 'low' } });
+    } catch (error) {
+      // 400 = paramètre non accepté par ce modèle : on réessaie sans options
+      if (error.providerStatus !== 400) throw error;
+      content = await chatCompletion(base);
     }
 
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-    const result = content ? JSON.parse(content) : {};
-
-    const selectedModel = MODEL_REGISTRY.find(m => m.id === result.selectedModelId) || FALLBACK_MODEL;
+    const result = parseJson(content);
+    const agent = AGENTS.includes(result.agent) ? result.agent : 'general';
 
     return {
-      selectedModel,
-      agent: result.agent || 'general',
-      activeProject: result.activeProject || 'none',
-      needsWebSearch: Boolean(result.needsWebSearch),
-      reasoning: result.reasoning || 'OK'
+      selectedModel: pickModel({ agent, hasImage, keys, llmPick: result.selectedModelId }),
+      agent,
+      activeProject: typeof result.activeProject === 'string' ? result.activeProject : 'none',
+      needsWebSearch: false,
+      reasoning: typeof result.reasoning === 'string' ? result.reasoning : 'OK'
     };
-
   } catch (error) {
-    return { selectedModel: FALLBACK_MODEL, agent: 'general', activeProject: 'none', reasoning: 'Catch error' };
+    console.error('[Planner] Échec, plan par défaut :', error.message);
+    return fallbackPlan(`Planner indisponible (${error.message})`, hasImage, keys);
   }
 }
 
-module.exports = { planRequest };
-    
+module.exports = { planRequest, pickModel };
