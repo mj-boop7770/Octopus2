@@ -7,7 +7,7 @@
 
 const PROJECT_CONTEXT = {
   name: "Octopus2 AI Assistant",
-  stack: ["Node.js Serverless (Vercel)", "Groq API", "Tavily Web Search API", "JavaScript CommonJS"],
+  stack: ["Node.js Serverless (Vercel)", "Groq API (gpt-oss)", "OpenRouter (optionnel)", "Gemini (images, optionnel)", "JSONBin", "JavaScript CommonJS"],
   architecture: {
     entryPoint: "api/chat.js (Handler principal Vercel)",
     modules: [
@@ -38,4 +38,3 @@ module.exports = {
   PROJECT_CONTEXT,
   getProjectMemory
 };
-  
