@@ -1,95 +1,55 @@
-// api/lib/planner.js
-// Le planner (petit modèle Groq) décide de l'AGENT (general / code / debug).
-// Le choix du MODÈLE est ensuite fait en code (pickModel), selon les clés disponibles :
-// c'est plus fiable que de demander à un petit modèle de choisir un identifiant.
+// api/lib/modelRegistry.js - Le Catalogue Officiel Octopus2
+//
+// Les noms de modèles peuvent être changés SANS toucher au code, via des variables
+// d'environnement Vercel (utile quand un fournisseur retire un modèle) :
+//   GROQ_FAST_MODEL, GROQ_BRAIN_MODEL, OPENROUTER_CODER_MODEL,
+//   OPENROUTER_DEBUG_MODEL, GEMINI_MODEL
 
-const { FAST_ID, BRAIN_ID, getModel } = require('./modelRegistry.js');
-const { chatCompletion } = require('./llm.js');
+const env = process.env;
 
-const AGENTS = ['general', 'code', 'debug'];
+const FAST_ID = 'groq-planner-fast';
+const BRAIN_ID = 'groq-brain-120b';
 
-function pickModel({ agent, hasImage, keys, llmPick }) {
-  if (hasImage && keys.gemini) return getModel('gemini-multimodal');
-  if (agent === 'code' && keys.openrouter) return getModel('openrouter-qwen-coder');
-  if (agent === 'debug' && keys.openrouter) return getModel('openrouter-deepseek-debug');
-  if (agent === 'code' || agent === 'debug') return getModel(BRAIN_ID);
-
-  const pick = getModel(llmPick);
-  if (pick && pick.provider === 'groq') return pick;
-  return getModel(FAST_ID);
-}
-
-function parseJson(text) {
-  try { return JSON.parse(text); } catch (e) { /* on tente d'extraire l'objet */ }
-  const match = String(text || '').match(/\{[\s\S]*\}/);
-  if (match) {
-    try { return JSON.parse(match[0]); } catch (e) { /* ignore */ }
+const MODEL_REGISTRY = [
+  {
+    id: FAST_ID,
+    provider: 'groq',
+    modelName: env.GROQ_FAST_MODEL || 'openai/gpt-oss-20b',
+    strengths: ['Vitesse', 'Formatage JSON', 'Classification d\'intentions', 'Conversations légères'],
+    bestFor: ['intent_planning', 'quick_chat', 'json_parsing']
+  },
+  {
+    id: BRAIN_ID,
+    provider: 'groq',
+    modelName: env.GROQ_BRAIN_MODEL || 'openai/gpt-oss-120b',
+    strengths: ['Raisonnement', 'Code', 'Architecture logicielle', 'Rédaction avancée'],
+    bestFor: ['general_expert', 'architecture_analysis', 'complex_reasoning', 'coding']
+  },
+  {
+    id: 'openrouter-qwen-coder',
+    provider: 'openrouter',
+    modelName: env.OPENROUTER_CODER_MODEL || 'qwen/qwen-2.5-coder-32b-instruct:free',
+    strengths: ['Spécialiste du code', 'JavaScript/HTML/CSS', 'Refactoring'],
+    bestFor: ['deep_coding', 'file_generation', 'refactoring']
+  },
+  {
+    id: 'openrouter-deepseek-debug',
+    provider: 'openrouter',
+    modelName: env.OPENROUTER_DEBUG_MODEL || 'deepseek/deepseek-r1:free',
+    strengths: ['Raisonnement pas à pas', 'Détection de bugs'],
+    bestFor: ['debugging', 'error_investigation']
+  },
+  {
+    id: 'gemini-multimodal',
+    provider: 'gemini',
+    modelName: env.GEMINI_MODEL || 'gemini-2.5-flash',
+    strengths: ['Analyse d\'images', 'Grand contexte'],
+    bestFor: ['image_analysis', 'document_reading']
   }
-  return {};
+];
+
+function getModel(id) {
+  return MODEL_REGISTRY.find(m => m.id === id) || null;
 }
 
-const SYSTEM_PROMPT = `Tu es le Planner d'Octopus2. Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour.
-
-AGENT ("agent") :
-- "general" : discussion, question, salutation, information, rédaction.
-- "code" : UNIQUEMENT si l'utilisateur demande explicitement d'écrire, modifier ou générer du code.
-- "debug" : UNIQUEMENT si l'utilisateur fournit une erreur ou demande de corriger un bug.
-
-MODÈLE ("selectedModelId") pour l'agent "general" :
-- "${FAST_ID}" : conversation simple, courte ou rapide.
-- "${BRAIN_ID}" : réflexion globale, analyse, tâche lourde.
-
-FORMAT :
-{"selectedModelId": "${FAST_ID}" ou "${BRAIN_ID}", "agent": "general" | "code" | "debug", "activeProject": "NomDuProjet ou none", "reasoning": "explication courte"}`;
-
-function fallbackPlan(reason, hasImage, keys) {
-  return {
-    selectedModel: pickModel({ agent: 'general', hasImage, keys }),
-    agent: 'general',
-    activeProject: 'none',
-    needsWebSearch: false,
-    reasoning: reason
-  };
-}
-
-async function planRequest(userMessage, historySummary = '', hasImage = false, keys = {}) {
-  if (!keys.groq) return fallbackPlan('Fallback sans clé Groq', hasImage, keys);
-
-  const fast = getModel(FAST_ID);
-  const messages = [
-    { role: 'system', content: SYSTEM_PROMPT },
-    {
-      role: 'user',
-      content: `Image jointe : ${hasImage}\nHistorique récent (extrait) : ${String(historySummary).slice(-1500)}\nMessage : "${String(userMessage).slice(0, 2000)}"`
-    }
-  ];
-
-  const base = { provider: 'groq', apiKey: keys.groq, model: fast.modelName, messages, temperature: 0, timeoutMs: 8000 };
-
-  try {
-    let content;
-    try {
-      content = await chatCompletion({ ...base, extra: { response_format: { type: 'json_object' }, reasoning_effort: 'low' } });
-    } catch (error) {
-      // 400 = paramètre non accepté par ce modèle : on réessaie sans options
-      if (error.providerStatus !== 400) throw error;
-      content = await chatCompletion(base);
-    }
-
-    const result = parseJson(content);
-    const agent = AGENTS.includes(result.agent) ? result.agent : 'general';
-
-    return {
-      selectedModel: pickModel({ agent, hasImage, keys, llmPick: result.selectedModelId }),
-      agent,
-      activeProject: typeof result.activeProject === 'string' ? result.activeProject : 'none',
-      needsWebSearch: false,
-      reasoning: typeof result.reasoning === 'string' ? result.reasoning : 'OK'
-    };
-  } catch (error) {
-    console.error('[Planner] Échec, plan par défaut :', error.message);
-    return fallbackPlan(`Planner indisponible (${error.message})`, hasImage, keys);
-  }
-}
-
-module.exports = { planRequest, pickModel };
+module.exports = { MODEL_REGISTRY, FAST_ID, BRAIN_ID, getModel };
