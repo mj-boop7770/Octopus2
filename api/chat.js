@@ -2,12 +2,10 @@
 // Point d'entrée HTTP de l'API Chat d'Octopus2
 
 const { handleOctopusCore } = require('./core/octopusCore.js');
+const { guard } = require('./lib/guard.js');
 
 module.exports = async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
-  res.setHeader('Access-Control-Allow-Headers', 'Accept, Content-Type, x-groq-key, x-openrouter-key, x-gemini-key, x-github-key, x-hf-key');
+  if (guard(req, res, { name: 'chat', limit: 20 })) return;
 
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Méthode non autorisée. Utilisez POST.' });
