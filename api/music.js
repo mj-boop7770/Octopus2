@@ -1,7 +1,11 @@
 // api/music.js
 // Route audio CommonJS compatible avec Vercel/Node.js
 
+const { guard } = require('./lib/guard.js');
+
 module.exports = async function handler(req, res) {
+  if (guard(req, res, { name: 'music', limit: 5 })) return;
+  if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Méthode non autorisée' });
 
   const { style, lyrics, prompt } = req.body || {};
@@ -36,6 +40,6 @@ module.exports = async function handler(req, res) {
     return res.status(200).send(Buffer.from(audioBuffer));
   } catch (error) {
     console.error('Erreur Backend API Music:', error);
-    return res.status(500).json({ error: 'Impossible de générer le morceau audio.' });
+    return res.status(502).json({ error: 'Impossible de générer le morceau audio (service Hugging Face indisponible ou modèle non servi).' });
   }
 };
