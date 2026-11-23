@@ -1,10 +1,15 @@
 {
-  "functions": {
-    "api/chat.js": {
-      "maxDuration": 60
-    },
-    "api/music.js": {
-      "maxDuration": 60
-    }
+  "name": "octopus2",
+  "version": "1.0.0",
+  "description": "Système multi-agents orchestré pour Octopus2",
+  "main": "api/chat.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "check": "node --check server.js && node --check api/chat.js && node --check api/music.js && node --check api/lib/agent.js && node --check api/lib/tools.js && node --check api/lib/llm.js && node --check api/lib/guard.js && node --check api/lib/jsonbin.js && node --check api/lib/securityLayer.js"
+  },
+  "dependencies": {},
+  "engines": {
+    "node": "24.x"
   }
 }
