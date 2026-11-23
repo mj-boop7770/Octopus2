@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "check": "node --check server.js && node --check api/chat.js && node --check api/music.js && node --check api/core/octopusCore.js && node --check api/lib/securityLayer.js && node --check api/lib/llm.js && node --check api/lib/planner.js && node --check api/lib/specializedAgents.js && node --check api/lib/guard.js && node --check api/lib/reviewer.js && node --check api/lib/modelRegistry.js"
+    "check": "node --check server.js && node --check api/chat.js && node --check api/music.js && node --check api/lib/agent.js && node --check api/lib/tools.js && node --check api/lib/llm.js && node --check api/lib/guard.js && node --check api/lib/jsonbin.js && node --check api/lib/securityLayer.js"
   },
   "dependencies": {},
   "engines": {
