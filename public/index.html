@@ -2,9 +2,14 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark light" />
     <title>🐙 MUJOS-OCTOPUS2</title>
-    
+
+    <!-- Polices : Source Serif 4 pour les réponses, Inter pour l'interface (repli : polices du système) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" />
     <!-- Font Awesome 6 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
     <!-- Highlight.js -->
@@ -14,167 +19,305 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/11.0.0/marked.min.js"></script>
     <!-- DOMPurify : assainit le HTML produit par le markdown -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
+
     <style>
-        body { background: #0f0f13; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #1e1e24; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #4f46e5; border-radius: 10px; }
-        .markdown-body { color: #e2e8f0; font-size: 0.875rem; line-height: 1.6; }
-        .markdown-body p { margin: 0.5rem 0; }
-        .markdown-body h1, .markdown-body h2, .markdown-body h3 { color: #f1f5f9; font-weight: 600; margin: 0.75rem 0 0.5rem; }
-        .markdown-body ul, .markdown-body ol { padding-left: 1.5rem; margin: 0.5rem 0; }
-        .markdown-body blockquote { border-left: 3px solid #4f46e5; padding-left: 1rem; color: #94a3b8; margin: 0.5rem 0; }
-        .markdown-body a { color: #818cf8; text-decoration: underline; }
-        .markdown-body table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; }
-        .markdown-body th, .markdown-body td { border: 1px solid #334155; padding: 0.4rem 0.75rem; text-align: left; }
-        .markdown-body th { background: #1e293b; }
+        :root {
+            --bg: #1e1d1b;
+            --side: #181715;
+            --surface: #292826;
+            --surface-2: #34322f;
+            --line: #3b3935;
+            --text: #ece9e2;
+            --muted: #9b968b;
+            --accent: #4cc2b0;
+            --accent-ink: #0d2b26;
+            --danger: #e5776b;
+            --ok: #62c58a;
+            --shadow: 0 6px 24px rgba(0, 0, 0, .35);
+            --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+            --serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+        }
+        @media (prefers-color-scheme: light) {
+            :root {
+                --bg: #f8f7f3;
+                --side: #efede7;
+                --surface: #ffffff;
+                --surface-2: #ebe9e2;
+                --line: #dcd9d0;
+                --text: #1f1e1b;
+                --muted: #6d6a62;
+                --accent: #12806f;
+                --accent-ink: #ffffff;
+                --danger: #b83d30;
+                --ok: #23804a;
+                --shadow: 0 6px 24px rgba(40, 35, 20, .10);
+            }
+        }
+
+        * { box-sizing: border-box; }
+        html, body { height: 100%; margin: 0; }
+        body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 15px; -webkit-font-smoothing: antialiased; }
+        button, select, textarea { font: inherit; color: inherit; }
+        button { cursor: pointer; background: none; border: 0; padding: 0; }
+        :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+        .hidden { display: none !important; }
+
+        .scroll { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+        .scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .scroll::-webkit-scrollbar-thumb { background: var(--line); border-radius: 6px; }
+
+        /* ---------- Barre latérale ---------- */
+        .sidebar { position: fixed; inset: 0 auto 0 0; width: 290px; background: var(--side); border-right: 1px solid var(--line); display: flex; flex-direction: column; z-index: 50; transform: translateX(-100%); transition: transform .25s ease; }
+        .sidebar.open { transform: none; }
+        .overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, .55); z-index: 40; }
+        .side-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 8px 18px; }
+        .brand { display: flex; align-items: center; gap: 10px; font-family: var(--serif); font-size: 19px; font-weight: 600; letter-spacing: -.01em; }
+        .brand-mark { font-size: 22px; line-height: 1; }
+        .icon-btn { width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; color: var(--muted); transition: background .15s, color .15s; }
+        .icon-btn:hover { background: var(--surface-2); color: var(--text); }
+        .new-chat { margin: 8px 12px 6px; display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 12px; font-weight: 500; color: var(--text); background: var(--surface); border: 1px solid var(--line); transition: border-color .15s; }
+        .new-chat:hover { border-color: var(--accent); }
+        .new-chat i { color: var(--accent); }
+        .chat-list { flex: 1; overflow-y: auto; padding: 8px 8px 12px; }
+        .chat-item { display: flex; align-items: center; gap: 4px; padding: 0 4px 0 12px; min-height: 42px; border-radius: 10px; color: var(--muted); cursor: pointer; font-size: 14px; }
+        .chat-item:hover { background: var(--surface-2); color: var(--text); }
+        .chat-item.active { background: var(--surface-2); color: var(--text); }
+        .chat-item .t { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .chat-item .del { width: 34px; height: 34px; border-radius: 8px; color: var(--muted); opacity: .55; }
+        .chat-item .del:hover { color: var(--danger); opacity: 1; background: var(--surface); }
+        .side-foot { padding: 12px 18px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+        .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+
+        /* ---------- Zone principale ---------- */
+        .main { height: 100vh; height: 100dvh; display: flex; flex-direction: column; }
+        .topbar { display: flex; align-items: center; gap: 6px; padding: 8px 10px; min-height: 56px; }
+        .topbar h1 { margin: 0; font-size: 15px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+        .messages { flex: 1; overflow-y: auto; padding: 8px 16px 24px; }
+        .thread { max-width: 740px; margin: 0 auto; }
+
+        /* Accueil */
+        .welcome { max-width: 640px; margin: 0 auto; padding: 9vh 4px 0; text-align: left; }
+        .welcome .mark { font-size: 40px; line-height: 1; margin-bottom: 18px; }
+        .welcome h2 { font-family: var(--serif); font-weight: 400; font-size: clamp(28px, 6vw, 40px); line-height: 1.15; letter-spacing: -.02em; margin: 0 0 10px; text-wrap: balance; }
+        .welcome p { color: var(--muted); margin: 0 0 26px; font-size: 15px; line-height: 1.5; }
+        .suggest { display: grid; gap: 10px; }
+        .suggest button { text-align: left; padding: 14px 16px; border: 1px solid var(--line); background: var(--surface); border-radius: 14px; display: flex; gap: 12px; align-items: flex-start; transition: border-color .15s, transform .15s; }
+        .suggest button:hover { border-color: var(--accent); }
+        .suggest button:active { transform: scale(.99); }
+        .suggest .s-ico { font-size: 18px; line-height: 1.3; }
+        .suggest .s-t { display: block; font-weight: 500; }
+        .suggest .s-d { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+
+        /* Messages */
+        .msg { margin: 22px 0; display: flex; }
+        .msg.user { justify-content: flex-end; }
+        .bubble { max-width: 86%; background: var(--surface-2); padding: 11px 16px; border-radius: 20px 20px 6px 20px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+        .bubble img { display: block; max-width: 100%; max-height: 260px; border-radius: 12px; margin-bottom: 8px; }
+        .file-chip { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; margin-bottom: 8px; max-width: 100%; }
+        .file-chip i { color: var(--accent); }
+        .file-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        .msg.bot { gap: 12px; align-items: flex-start; }
+        .avatar { flex: none; width: 28px; height: 28px; border-radius: 50%; background: var(--surface-2); display: flex; align-items: center; justify-content: center; font-size: 15px; margin-top: 2px; }
+        .bot-body { min-width: 0; flex: 1; }
+        .tools { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+        .tool { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px; }
+        .tool .ok { color: var(--ok); }
+        .tool .bad { color: var(--danger); }
+        .gen-img { display: block; margin: 6px 0 12px; }
+        .gen-img img { display: block; width: min(100%, 420px); height: auto; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 16px; border: 1px solid var(--line); background: var(--surface); }
+        .player { margin: 6px 0 12px; max-width: 420px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; }
+        .player .p-t { font-size: 13px; color: var(--muted); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+        .player audio { width: 100%; }
+        .player a { display: inline-block; margin-top: 8px; font-size: 13px; color: var(--accent); text-decoration: none; }
+        .player a:hover { text-decoration: underline; }
+        .pending { color: var(--muted); font-size: 13.5px; margin: 6px 0 12px; display: flex; align-items: center; gap: 8px; }
+
+        .typing { display: inline-flex; gap: 5px; padding: 10px 0; }
+        .typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); animation: blink 1.2s infinite ease-in-out; }
+        .typing i:nth-child(2) { animation-delay: .15s; }
+        .typing i:nth-child(3) { animation-delay: .3s; }
+        @keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+
+        .sources { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
+        .sources a { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; font-size: 12.5px; color: var(--text); text-decoration: none; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 5px 10px; }
+        .sources a:hover { border-color: var(--accent); }
+        .sources a b { color: var(--accent); font-weight: 600; }
+        .sources a span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+
+        .actions { display: flex; gap: 2px; margin-top: 8px; }
+        .actions button { width: 34px; height: 34px; border-radius: 8px; color: var(--muted); font-size: 13px; }
+        .actions button:hover { background: var(--surface-2); color: var(--text); }
+
+        /* Texte des réponses */
+        .markdown-body { font-family: var(--serif); font-size: 17px; line-height: 1.7; overflow-wrap: anywhere; }
+        .markdown-body > :first-child { margin-top: 0; }
+        .markdown-body > :last-child { margin-bottom: 0; }
+        .markdown-body p { margin: .75em 0; }
+        .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 { font-family: var(--sans); font-weight: 600; line-height: 1.3; margin: 1.4em 0 .5em; letter-spacing: -.01em; }
+        .markdown-body h1 { font-size: 1.35em; }
+        .markdown-body h2 { font-size: 1.2em; }
+        .markdown-body h3, .markdown-body h4 { font-size: 1.05em; }
+        .markdown-body ul, .markdown-body ol { padding-left: 1.5em; margin: .75em 0; }
+        .markdown-body li { margin: .3em 0; }
+        .markdown-body blockquote { border-left: 3px solid var(--accent); margin: 1em 0; padding: 0 0 0 1em; color: var(--muted); }
+        .markdown-body a { color: var(--accent); }
+        .markdown-body hr { border: 0; border-top: 1px solid var(--line); margin: 1.5em 0; }
+        .markdown-body :not(pre) > code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .84em; background: var(--surface-2); padding: .15em .4em; border-radius: 6px; }
+        .markdown-body table { border-collapse: collapse; width: 100%; margin: 1em 0; font-family: var(--sans); font-size: 14px; display: block; overflow-x: auto; }
+        .markdown-body th, .markdown-body td { border: 1px solid var(--line); padding: 8px 12px; text-align: left; }
+        .markdown-body th { background: var(--surface); }
+        .markdown-body img { max-width: 100%; border-radius: 12px; }
+
+        .codebox { margin: 1.1em 0; border-radius: 14px; overflow: hidden; background: #16151a; border: 1px solid #2c2b33; }
+        .codebox .bar { display: flex; align-items: center; justify-content: space-between; padding: 7px 8px 7px 14px; background: #1f1e25; font-family: var(--sans); font-size: 12px; color: #a7a3b3; }
+        .codebox .bar button { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 8px; color: #a7a3b3; font-size: 12px; }
+        .codebox .bar button:hover { background: #2c2b33; color: #fff; }
+        .codebox pre { margin: 0; padding: 14px 16px; overflow-x: auto; font-size: 13px; line-height: 1.6; }
+        .codebox code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: none !important; padding: 0 !important; color: #e6e1f0; }
+
+        /* ---------- Zone de saisie ---------- */
+        .dock { padding: 6px 12px calc(10px + env(safe-area-inset-bottom)); }
+        .composer { max-width: 740px; margin: 0 auto; background: var(--surface); border: 1px solid var(--line); border-radius: 24px; box-shadow: var(--shadow); padding: 10px 10px 8px 14px; transition: border-color .15s; }
+        .composer:focus-within { border-color: var(--accent); }
+        .composer textarea { display: block; width: 100%; background: transparent; border: 0; outline: 0; resize: none; padding: 6px 4px; min-height: 28px; max-height: 160px; line-height: 1.5; font-size: 16px; }
+        .composer textarea::placeholder { color: var(--muted); }
+        .file-preview { display: flex; align-items: center; gap: 8px; padding: 2px 0 8px; }
+        .file-preview #file-preview-content { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; background: var(--surface-2); border-radius: 10px; padding: 6px 10px; min-width: 0; }
+        .file-preview #file-preview-content i { color: var(--accent); }
+        .file-preview #file-preview-content span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
+        .tools-row { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+        .tools-row .grow { flex: 1; }
+        .chip-btn { height: 36px; display: inline-flex; align-items: center; gap: 7px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 13.5px; transition: background .15s, color .15s, border-color .15s; }
+        .chip-btn:hover { color: var(--text); background: var(--surface-2); }
+        .chip-btn[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
+        #web-status { font-weight: 600; }
+        select.chip-btn { appearance: none; -webkit-appearance: none; padding-right: 12px; max-width: 150px; background: transparent; cursor: pointer; }
+        select.chip-btn option { background: var(--surface); color: var(--text); }
+        .send { width: 38px; height: 38px; flex: none; border-radius: 50%; background: var(--accent); color: var(--accent-ink); display: inline-flex; align-items: center; justify-content: center; opacity: .35; transition: opacity .15s, transform .1s; }
+        .send.ready { opacity: 1; }
+        .send:active { transform: scale(.94); }
+        .fine { text-align: center; font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+
+        label.icon-btn { cursor: pointer; }
+        #mic-btn.rec { color: var(--danger); animation: blink 1s infinite; }
+
+        @media (min-width: 768px) {
+            .sidebar { transform: none; }
+            .overlay, #close-sidebar-btn, #open-sidebar-btn { display: none !important; }
+            .main { margin-left: 290px; }
+            .messages { padding: 8px 28px 28px; }
+            .topbar { padding: 8px 20px; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            * { animation: none !important; transition: none !important; }
+        }
     </style>
 </head>
 <body>
 
-    <!-- OVERLAY MOBILE -->
-    <div id="sidebar-overlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 hidden md:hidden"></div>
+    <!-- Voile derrière le menu (mobile) -->
+    <div id="sidebar-overlay" class="overlay hidden"></div>
 
-    <!-- SIDEBAR -->
-    <aside id="sidebar" class="fixed top-0 left-0 z-50 h-full w-72 bg-[#14141a] border-r border-slate-800/60 shadow-2xl -translate-x-full md:translate-x-0 flex flex-col transition-transform duration-300">
-        <div class="flex items-center justify-between px-5 py-4 border-b border-slate-800/60">
-            <div class="flex items-center gap-2.5">
-                <span class="text-xl">🐙</span>
-                <span class="font-bold text-sm text-slate-200">MUJOS-OCTOPUS2</span>
-                <span class="text-[10px] font-mono text-indigo-400 bg-indigo-600/20 px-2 py-0.5 rounded-full">v2</span>
-            </div>
-            <button id="close-sidebar-btn" class="md:hidden text-slate-400 hover:text-slate-200 transition">
-                <i class="fa-regular fa-xmark text-lg"></i>
-            </button>
+    <!-- BARRE LATÉRALE -->
+    <aside id="sidebar" class="sidebar" aria-label="Discussions">
+        <div class="side-head">
+            <div class="brand"><span class="brand-mark">🐙</span><span>Octopus2</span></div>
+            <button id="close-sidebar-btn" class="icon-btn" aria-label="Fermer le menu"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        
-        <div class="px-3 pt-3">
-            <button id="new-chat-btn" class="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-4 py-2.5 text-xs font-medium transition shadow-md active:scale-95">
-                <i class="fa-solid fa-plus"></i> Nouvelle discussion
-            </button>
-        </div>
-        
-        <div id="chat-list" class="flex-1 overflow-y-auto custom-scrollbar px-3 py-4 space-y-1.5"></div>
-        
-        <div class="border-t border-slate-800/60 px-5 py-3 text-[10px] text-slate-500 flex items-center justify-between">
-            <span>🧠 MUJOS-OCTOPUS2</span>
-            <span class="flex items-center gap-1.5">
-                <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                Connecté
-            </span>
-        </div>
+        <button id="new-chat-btn" class="new-chat" type="button"><i class="fa-solid fa-plus"></i> Nouvelle discussion</button>
+        <div id="chat-list" class="chat-list scroll"></div>
+        <div class="side-foot"><span class="dot"></span> MUJOS-OCTOPUS2</div>
     </aside>
 
     <!-- ZONE PRINCIPALE -->
-    <main class="md:ml-72 h-screen flex flex-col bg-[#0b0b10]">
-        <!-- HEADER -->
-        <header class="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-slate-800/50 bg-[#0f0f13]/80 backdrop-blur-sm sticky top-0 z-20">
-            <div class="flex items-center gap-3">
-                <button id="open-sidebar-btn" class="md:hidden text-slate-400 hover:text-slate-200 transition text-lg">
-                    <i class="fa-solid fa-bars"></i>
-                </button>
-                <h1 id="current-chat-title" class="text-sm font-semibold text-slate-200 truncate max-w-[140px] sm:max-w-xs">Nouvelle discussion</h1>
-            </div>
-            <div class="flex items-center gap-3">
-                <select id="mode-select" class="bg-slate-900 border border-slate-800 text-slate-300 text-xs rounded-xl px-3 py-1.5 outline-none focus:border-indigo-500/50 transition cursor-pointer">
-                    <option value="standard">💬 Standard</option>
-                    <option value="creative">🎨 Créatif</option>
-                    <option value="code">💻 Code</option>
-                    <option value="concise">📌 Précis</option>
-                    <option value="music">🎵 Musique (Audio)</option>
-                </select>
-                <button id="web-search-toggle" class="flex items-center gap-1.5 bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 rounded-xl px-3 py-1.5 text-xs transition active:scale-95">
-                    <i class="fa-solid fa-globe"></i>
-                    <span id="web-status" class="font-bold text-red-400">OFF</span>
-                </button>
-            </div>
+    <main class="main">
+        <header class="topbar">
+            <button id="open-sidebar-btn" class="icon-btn" aria-label="Ouvrir le menu"><i class="fa-solid fa-bars"></i></button>
+            <h1 id="current-chat-title">Nouvelle discussion</h1>
         </header>
 
-        <!-- MESSAGES -->
-        <div id="messages-container" class="flex-1 overflow-y-auto custom-scrollbar px-4 sm:px-8 py-6 space-y-5"></div>
+        <div id="messages-container" class="messages scroll" aria-live="polite"></div>
 
-        <!-- PRÉVISUALISATION FICHIER JOINT -->
-        <div id="file-preview-container" class="hidden px-4 sm:px-8 py-2 bg-slate-900/40 border-t border-slate-800/40 flex items-center gap-3">
-            <div id="file-preview-content" class="text-xs text-slate-300 bg-slate-800 px-3 py-1.5 rounded-lg flex items-center gap-2"></div>
-            <button id="remove-file-btn" class="text-slate-500 hover:text-red-400 text-xs"><i class="fa-solid fa-xmark"></i></button>
-        </div>
+        <div class="dock">
+            <form id="chat-form" class="composer">
+                <!-- Fichier joint -->
+                <div id="file-preview-container" class="file-preview hidden">
+                    <div id="file-preview-content"></div>
+                    <button id="remove-file-btn" type="button" class="icon-btn" style="width:32px;height:32px" aria-label="Retirer le fichier"><i class="fa-solid fa-xmark"></i></button>
+                </div>
 
-        <!-- ZONE DE SAISIE -->
-        <div class="border-t border-slate-800/50 bg-[#0f0f13] px-4 sm:px-8 py-4">
-            <form id="chat-form" class="max-w-4xl mx-auto flex items-end gap-2 bg-slate-900/70 border border-slate-800/60 rounded-2xl p-1.5 shadow-lg focus-within:border-indigo-500/50 transition">
-                
-                <!-- BOUTON PIÈCE JOINTE -->
-                <label for="file-input" class="text-slate-500 hover:text-indigo-400 transition p-2 text-sm cursor-pointer active:scale-95 flex items-center justify-center" title="Joindre une image ou un fichier">
-                    <i class="fa-solid fa-paperclip"></i>
-                </label>
-                <input type="file" id="file-input" class="hidden" accept="image/*, text/plain, text/javascript, text/css, text/html, application/json, .md">
+                <textarea id="user-input" rows="1" placeholder="Écris ton message…" aria-label="Message"></textarea>
 
-                <!-- BOUTON MICRO -->
-                <button id="mic-btn" type="button" class="text-slate-500 hover:text-indigo-400 transition p-2 text-sm active:scale-95" title="Dictée vocale">
-                    <i class="fa-solid fa-microphone"></i>
-                </button>
-                
-                <textarea id="user-input" rows="1" placeholder="Posez votre question..." class="flex-1 bg-transparent text-slate-200 text-sm placeholder:text-slate-500 outline-none resize-none py-2 min-h-[40px] max-h-32 leading-relaxed custom-scrollbar"></textarea>
-                
-                <button id="send-btn" type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-3 py-2 transition text-xs font-medium flex items-center gap-1.5 shadow-md active:scale-95">
-                    <span>Envoyer</span>
-                    <i class="fa-solid fa-paper-plane text-[10px]"></i>
-                </button>
+                <div class="tools-row">
+                    <label for="file-input" class="icon-btn" title="Joindre une image ou un fichier" aria-label="Joindre un fichier"><i class="fa-solid fa-paperclip"></i></label>
+                    <input type="file" id="file-input" class="hidden" accept="image/*, text/plain, text/javascript, text/css, text/html, application/json, .md">
+
+                    <button id="web-search-toggle" type="button" class="chip-btn" aria-pressed="false" title="Recherche internet">
+                        <i class="fa-solid fa-globe"></i><span>Web</span><span id="web-status">OFF</span>
+                    </button>
+
+                    <select id="mode-select" class="chip-btn" aria-label="Mode">
+                        <option value="standard">Standard</option>
+                        <option value="creative">Créatif</option>
+                        <option value="code">Code</option>
+                        <option value="concise">Précis</option>
+                        <option value="music">Musique</option>
+                    </select>
+
+                    <span class="grow"></span>
+
+                    <button id="mic-btn" type="button" class="icon-btn" title="Dictée vocale" aria-label="Dictée vocale"><i class="fa-solid fa-microphone"></i></button>
+                    <button id="send-btn" type="submit" class="send" aria-label="Envoyer"><i class="fa-solid fa-arrow-up"></i></button>
+                </div>
             </form>
-            <p class="text-center text-[10px] text-slate-500 mt-2.5 tracking-wide">
-                ⚡ Connecté au serveur Vercel · Code & Vision · <span class="text-indigo-400">🐙 MUJOS-OCTOPUS2</span>
-            </p>
+            <p class="fine">Octopus2 peut se tromper : vérifie les infos importantes.</p>
         </div>
     </main>
 
-    <!-- LOGIQUE JAVASCRIPT AMÉLIORÉE -->
     <script>
-        // Config Markdown & Syntax Highlighting
+        // ---------- Markdown & coloration du code ----------
         const renderer = new marked.Renderer();
         renderer.code = function(code, language) {
+            // Compatible avec toutes les versions de marked (certaines passent un objet au lieu de deux arguments)
+            if (code && typeof code === 'object') { language = code.lang; code = code.text; }
+            language = String(language || '').split(/\s+/)[0];
+            code = String(code == null ? '' : code);
             const validLang = language && hljs.getLanguage(language) ? language : 'plaintext';
             const highlighted = hljs.highlight(code, { language: validLang }).value;
             const codeId = 'code-' + Math.random().toString(36).substr(2, 9);
-
             return `
-                <div class="relative group my-4 rounded-xl overflow-hidden border border-slate-800 bg-slate-900 shadow-lg">
-                    <div class="flex items-center justify-between px-4 py-2 bg-slate-800 text-[11px] text-slate-400 font-mono border-b border-slate-700/50">
-                        <span class="uppercase">${validLang}</span>
-                        <button type="button" data-copy-target="${codeId}" class="hover:text-white transition flex items-center gap-1.5">
-                            <i class="fa-regular fa-copy"></i> <span class="copy-text">Copier</span>
-                        </button>
+                <div class="codebox">
+                    <div class="bar">
+                        <span>${validLang}</span>
+                        <button type="button" data-copy-target="${codeId}"><i class="fa-regular fa-copy"></i> <span class="copy-text">Copier</span></button>
                     </div>
-                    <pre class="p-4 overflow-x-auto custom-scrollbar text-xs font-mono"><code id="${codeId}" class="hljs language-${validLang}">${highlighted}</code></pre>
+                    <pre class="scroll"><code id="${codeId}" class="hljs language-${validLang}">${highlighted}</code></pre>
                 </div>`;
         };
         marked.setOptions({ renderer: renderer, breaks: true, gfm: true });
 
-        // Utilitaires de copie et lecture vocale
         window.copyCode = function(id, btn) {
-            const codeElement = document.getElementById(id);
-            if (!codeElement) return;
-            navigator.clipboard.writeText(codeElement.innerText).then(() => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            navigator.clipboard.writeText(el.innerText).then(() => {
                 const span = btn.querySelector('.copy-text');
-                if (span) span.innerText = 'Copié !';
+                if (span) span.innerText = 'Copié';
                 setTimeout(() => { if (span) span.innerText = 'Copier'; }, 2000);
-            });
+            }).catch(() => {});
         };
 
         window.speakText = function(btn) {
-            if ('speechSynthesis' in window) {
-                const container = btn.closest('.markdown-body');
-                if (!container) return;
-                window.speechSynthesis.cancel();
-                const utterance = new SpeechSynthesisUtterance(container.innerText);
-                utterance.lang = 'fr-FR';
-                window.speechSynthesis.speak(utterance);
-            }
+            if (!('speechSynthesis' in window)) return;
+            const container = btn.closest('.bot-body').querySelector('.markdown-body');
+            if (!container) return;
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(container.innerText);
+            u.lang = 'fr-FR';
+            window.speechSynthesis.speak(u);
         };
 
-        // État Global
+        // ---------- État ----------
         let chats = [];
         try {
             const stored = JSON.parse(localStorage.getItem('octopus_chats'));
@@ -184,75 +327,90 @@
         let isWebSearchActive = false;
         let selectedFileData = null;
 
-        // Assainit le HTML venant du markdown (anti-XSS). Si DOMPurify n'a pas chargé : texte brut échappé.
+        const escapeHtml = (text) => String(text == null ? '' : text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         const safeHtml = (html) => window.DOMPurify ? DOMPurify.sanitize(html) : escapeHtml(html);
 
-        // Identifiant de session aléatoire, propre à chaque discussion
+        function safeUrl(u) {
+            u = String(u || '');
+            return /^(https:\/\/|data:image\/)/.test(u) ? u.replace(/"/g, '%22').replace(/</g, '%3C') : '';
+        }
+
         function newSessionId() {
             try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
             return 'sid-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
         }
 
-        // Éléments DOM
-        const sidebar = document.getElementById('sidebar');
-        const sidebarOverlay = document.getElementById('sidebar-overlay');
-        const openSidebarBtn = document.getElementById('open-sidebar-btn');
-        const closeSidebarBtn = document.getElementById('close-sidebar-btn');
-        const chatListEl = document.getElementById('chat-list');
-        const messagesContainer = document.getElementById('messages-container');
-        const chatForm = document.getElementById('chat-form');
-        const userInput = document.getElementById('user-input');
-        const modeSelect = document.getElementById('mode-select');
-        const webToggle = document.getElementById('web-search-toggle');
-        const webStatus = document.getElementById('web-status');
-        const newChatBtn = document.getElementById('new-chat-btn');
-        const currentChatTitle = document.getElementById('current-chat-title');
-        const micBtn = document.getElementById('mic-btn');
-        const fileInput = document.getElementById('file-input');
-        const filePreviewContainer = document.getElementById('file-preview-container');
-        const filePreviewContent = document.getElementById('file-preview-content');
-        const removeFileBtn = document.getElementById('remove-file-btn');
+        // ---------- Éléments ----------
+        const $ = (id) => document.getElementById(id);
+        const sidebar = $('sidebar'), sidebarOverlay = $('sidebar-overlay');
+        const openSidebarBtn = $('open-sidebar-btn'), closeSidebarBtn = $('close-sidebar-btn');
+        const chatListEl = $('chat-list'), messagesContainer = $('messages-container');
+        const chatForm = $('chat-form'), userInput = $('user-input'), sendBtn = $('send-btn');
+        const modeSelect = $('mode-select'), webToggle = $('web-search-toggle'), webStatus = $('web-status');
+        const newChatBtn = $('new-chat-btn'), currentChatTitle = $('current-chat-title');
+        const micBtn = $('mic-btn'), fileInput = $('file-input');
+        const filePreviewContainer = $('file-preview-container'), filePreviewContent = $('file-preview-content');
+        const removeFileBtn = $('remove-file-btn');
 
+        // Clics dans les messages : copier du code, copier/lire une réponse
         messagesContainer.addEventListener('click', (e) => {
-            const btn = e.target.closest('[data-copy-target]');
-            if (btn) window.copyCode(btn.getAttribute('data-copy-target'), btn);
+            const codeBtn = e.target.closest('[data-copy-target]');
+            if (codeBtn) return window.copyCode(codeBtn.getAttribute('data-copy-target'), codeBtn);
+            const act = e.target.closest('[data-act]');
+            if (!act) return;
+            const chat = chats.find(c => c.id === currentChatId);
+            const msg = chat && chat.messages[Number(act.getAttribute('data-idx'))];
+            if (act.getAttribute('data-act') === 'copy' && msg) {
+                navigator.clipboard.writeText(msg.content || '').then(() => {
+                    act.innerHTML = '<i class="fa-solid fa-check"></i>';
+                    setTimeout(() => { act.innerHTML = '<i class="fa-regular fa-copy"></i>'; }, 1500);
+                }).catch(() => {});
+            } else if (act.getAttribute('data-act') === 'speak') {
+                window.speakText(act);
+            }
         });
 
-        // Dictée vocale
+        // Suggestions de l'écran d'accueil
+        messagesContainer.addEventListener('click', (e) => {
+            const s = e.target.closest('[data-suggest]');
+            if (!s) return;
+            if (s.getAttribute('data-web') === '1' && !isWebSearchActive) webToggle.click();
+            userInput.value = s.getAttribute('data-suggest');
+            userInput.dispatchEvent(new Event('input'));
+            userInput.focus();
+        });
+
+        // ---------- Dictée vocale ----------
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            const recognition = new SpeechRecognition();
+            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const recognition = new SR();
             recognition.lang = 'fr-FR';
             recognition.continuous = false;
-
-            micBtn.onclick = () => {
-                micBtn.classList.add('text-red-500', 'animate-pulse');
-                recognition.start();
-            };
-
+            micBtn.onclick = () => { micBtn.classList.add('rec'); try { recognition.start(); } catch (e) { micBtn.classList.remove('rec'); } };
             recognition.onresult = (e) => {
                 userInput.value += (userInput.value ? ' ' : '') + e.results[0][0].transcript;
                 userInput.dispatchEvent(new Event('input'));
-                micBtn.classList.remove('text-red-500', 'animate-pulse');
+                micBtn.classList.remove('rec');
             };
-
-            recognition.onerror = recognition.onend = () => {
-                micBtn.classList.remove('text-red-500', 'animate-pulse');
-            };
+            recognition.onerror = recognition.onend = () => micBtn.classList.remove('rec');
+        } else {
+            micBtn.classList.add('hidden');
         }
 
-        // IMPORTATION DE FICHIERS : texte/code (lus en clair) et images (réduites avant envoi)
+        // ---------- Fichiers ----------
         const MAX_TEXT_BYTES = 25 * 1024;
 
         function showFilePreview(iconClass, label) {
-            filePreviewContent.innerHTML = `<i class="fa-solid ${iconClass} text-indigo-400"></i> <span class="truncate max-w-xs">${escapeHtml(label)}</span>`;
+            filePreviewContent.innerHTML = `<i class="fa-solid ${iconClass}"></i> <span>${escapeHtml(label)}</span>`;
             filePreviewContainer.classList.remove('hidden');
+            updateSendState();
         }
 
         function rejectFile(message) {
             selectedFileData = null;
             fileInput.value = '';
             filePreviewContainer.classList.add('hidden');
+            updateSendState();
             alert(message);
         }
 
@@ -278,10 +436,7 @@
         fileInput.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
-
-            const isTextFile = file.type.startsWith('text/') ||
-                               /\.(txt|js|json|html|css|md)$/i.test(file.name);
-
+            const isTextFile = file.type.startsWith('text/') || /\.(txt|js|json|html|css|md)$/i.test(file.name);
             if (isTextFile) {
                 if (file.size > MAX_TEXT_BYTES) return rejectFile('Fichier texte trop volumineux (25 Ko maximum).');
                 const reader = new FileReader();
@@ -306,144 +461,198 @@
             selectedFileData = null;
             fileInput.value = '';
             filePreviewContainer.classList.add('hidden');
+            updateSendState();
         };
 
-        // Redimensionnement du textarea
+        // ---------- Saisie ----------
+        function updateSendState() {
+            sendBtn.classList.toggle('ready', Boolean(userInput.value.trim() || selectedFileData));
+        }
+
         userInput.addEventListener('input', function() {
             this.style.height = 'auto';
-            this.style.height = Math.min(this.scrollHeight, 128) + 'px';
+            this.style.height = Math.min(this.scrollHeight, 160) + 'px';
+            updateSendState();
         });
 
-        // Contrôle Sidebar & Web Search
-        openSidebarBtn.onclick = () => { sidebar.classList.remove('-translate-x-full'); sidebarOverlay.classList.remove('hidden'); };
-        closeSidebarBtn.onclick = () => { sidebar.classList.add('-translate-x-full'); sidebarOverlay.classList.add('hidden'); };
+        // Entrée envoie (ordinateur) ; sur téléphone, Entrée = nouvelle ligne
+        userInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && window.matchMedia('(pointer: fine)').matches) {
+                e.preventDefault();
+                chatForm.requestSubmit();
+            }
+        });
+
+        // ---------- Menu & recherche web ----------
+        openSidebarBtn.onclick = () => { sidebar.classList.add('open'); sidebarOverlay.classList.remove('hidden'); };
+        closeSidebarBtn.onclick = () => { sidebar.classList.remove('open'); sidebarOverlay.classList.add('hidden'); };
         sidebarOverlay.onclick = closeSidebarBtn.onclick;
 
         webToggle.onclick = () => {
             isWebSearchActive = !isWebSearchActive;
             webStatus.textContent = isWebSearchActive ? 'ON' : 'OFF';
-            webStatus.className = isWebSearchActive ? 'text-emerald-400 font-bold' : 'text-red-400';
+            webToggle.setAttribute('aria-pressed', String(isWebSearchActive));
         };
 
-        // Gestion des chats
+        // ---------- Discussions ----------
         function saveChats() {
-            // Les blob: URL audio ne survivent pas à un rechargement : on ne les stocke pas
-            const serialize = () => JSON.stringify(chats, (key, value) => key === 'audioUrl' ? undefined : value);
+            // On ne stocke ni les URL audio temporaires, ni l'état de flux, ni les images en data:
+            const serialize = () => JSON.stringify(chats, (key, value) => (key === 'audioUrl' || key === 'audios' || key === 'streaming') ? undefined : (key === 'images' && Array.isArray(value) ? value.filter(u => !String(u).startsWith('data:')) : value));
             try { localStorage.setItem('octopus_chats', serialize()); return; } catch (e) { /* quota plein */ }
-            // Quota plein : on retire les images stockées puis on réessaie
             chats.forEach(c => c.messages.forEach(m => { if (m.file && m.file.data) delete m.file.data; }));
             try { localStorage.setItem('octopus_chats', serialize()); }
             catch (e) { console.warn('Sauvegarde locale impossible :', e.message); }
         }
 
         function createNewChat() {
-            const newChat = { id: Date.now().toString(), sid: newSessionId(), title: 'Nouvelle discussion', messages: [] };
-            chats.unshift(newChat);
-            currentChatId = newChat.id;
+            const chat = { id: Date.now().toString(), sid: newSessionId(), title: 'Nouvelle discussion', messages: [] };
+            chats.unshift(chat);
+            currentChatId = chat.id;
             saveChats();
             renderSidebar();
             renderMessages();
+            closeSidebarBtn.onclick();
         }
 
         function renderSidebar() {
             chatListEl.innerHTML = '';
             chats.forEach(chat => {
-                const btn = document.createElement('div');
-                const isActive = chat.id === currentChatId;
-                btn.className = `p-2 rounded-xl text-xs font-medium cursor-pointer flex items-center justify-between transition ${isActive ? 'bg-indigo-600/10 text-indigo-400' : 'text-slate-400 hover:bg-slate-800/50'}`;
-                btn.innerHTML = `
-                    <div class="flex items-center gap-2 truncate">
-                        <i class="fa-regular fa-message text-slate-500"></i>
-                        <span class="truncate">${escapeHtml(chat.title)}</span>
-                    </div>
-                    <button onclick="deleteChat(event, '${chat.id}')" class="text-slate-500 hover:text-red-400 p-1"><i class="fa-solid fa-trash"></i></button>`;
-                btn.onclick = (e) => {
-                    if (!e.target.closest('button')) {
-                        currentChatId = chat.id;
-                        renderSidebar();
-                        renderMessages();
-                    }
+                const item = document.createElement('div');
+                item.className = 'chat-item' + (chat.id === currentChatId ? ' active' : '');
+                item.innerHTML = `<span class="t">${escapeHtml(chat.title)}</span><button type="button" class="del" aria-label="Supprimer la discussion"><i class="fa-regular fa-trash-can"></i></button>`;
+                item.querySelector('.del').onclick = (e) => { e.stopPropagation(); deleteChat(chat.id); };
+                item.onclick = () => {
+                    currentChatId = chat.id;
+                    renderSidebar();
+                    renderMessages();
+                    closeSidebarBtn.onclick();
                 };
-                chatListEl.appendChild(btn);
+                chatListEl.appendChild(item);
             });
         }
 
-        window.deleteChat = function(e, id) {
-            e.stopPropagation();
+        function deleteChat(id) {
             chats = chats.filter(c => c.id !== id);
             currentChatId = chats.length > 0 ? chats[0].id : null;
             saveChats();
             if (!currentChatId) createNewChat(); else { renderSidebar(); renderMessages(); }
-        };
+        }
+        window.deleteChat = (e, id) => { if (e && e.stopPropagation) e.stopPropagation(); deleteChat(id); };
 
         newChatBtn.onclick = createNewChat;
 
+        // ---------- Affichage des messages ----------
+        function welcomeHtml() {
+            const items = [
+                ['🎨', 'Créer une image', 'Dessine un poulpe astronaute au style aquarelle', 'Dessine un poulpe astronaute, style aquarelle', 0],
+                ['🎵', 'Composer une musique', 'Une ambiance lofi calme pour travailler', 'Compose une musique lofi calme avec piano et pluie', 0],
+                ['🌐', 'Chercher sur internet', 'Les dernières nouvelles, avec les sources', "Quelles sont les dernières nouvelles de l'IA cette semaine ?", 1]
+            ];
+            return `<div class="welcome">
+                <div class="mark">🐙</div>
+                <h2>Qu'est-ce qu'on fait aujourd'hui ?</h2>
+                <p>Pose une question, joins un fichier, ou demande une image, une musique, une recherche web.</p>
+                <div class="suggest">${items.map(i => `
+                    <button type="button" data-suggest="${escapeHtml(i[3])}" data-web="${i[4]}">
+                        <span class="s-ico">${i[0]}</span>
+                        <span><span class="s-t">${i[1]}</span><span class="s-d">${i[2]}</span></span>
+                    </button>`).join('')}
+                </div>
+            </div>`;
+        }
+
+        function toolsHtml(msg) {
+            const list = (msg.tools || []).map(t => {
+                const icon = t.done ? (t.ok === false ? '<i class="fa-solid fa-triangle-exclamation bad"></i>' : '<i class="fa-solid fa-check ok"></i>') : '<i class="fa-solid fa-spinner fa-spin"></i>';
+                return `<span class="tool">${icon} ${escapeHtml(t.label || t.name)}</span>`;
+            }).join('');
+            return list ? `<div class="tools">${list}</div>` : '';
+        }
+
+        function mediaHtml(msg) {
+            let html = '';
+            (msg.images || []).forEach(u => {
+                const url = safeUrl(u);
+                if (url) html += `<a class="gen-img" href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="Image générée" loading="lazy" /></a>`;
+            });
+            if (msg.musicPending) html += `<div class="pending"><i class="fa-solid fa-spinner fa-spin"></i> Composition en cours, 30 à 60 secondes…</div>`;
+            (msg.audios || []).forEach(a => {
+                if (a) html += `<div class="player"><div class="p-t"><i class="fa-solid fa-music"></i> Morceau généré</div><audio controls src="${a}"></audio><br><a href="${a}" download="octopus-music.wav"><i class="fa-solid fa-download"></i> Télécharger (.wav)</a></div>`;
+            });
+            if (msg.isAudio && msg.audioUrl) {
+                html += `<div class="player"><div class="p-t"><i class="fa-solid fa-music"></i> Morceau généré</div><audio controls src="${msg.audioUrl}"></audio><br><a href="${msg.audioUrl}" download="octopus-music.wav"><i class="fa-solid fa-download"></i> Télécharger (.wav)</a></div>`;
+            }
+            return html;
+        }
+
+        function sourcesHtml(msg) {
+            const list = (msg.sources || []).map((s, i) => {
+                const url = safeUrl(s.url);
+                return url ? `<a href="${url}" target="_blank" rel="noopener noreferrer"><b>${i + 1}</b><span>${escapeHtml(s.title || url)}</span></a>` : '';
+            }).join('');
+            return list ? `<div class="sources">${list}</div>` : '';
+        }
+
+        function userHtml(msg) {
+            let fileHtml = '';
+            if (msg.file) {
+                if (msg.file.type && msg.file.type.startsWith('image/') && msg.file.data) {
+                    const url = safeUrl(msg.file.data);
+                    if (url) fileHtml = `<img src="${url}" alt="Image jointe" />`;
+                } else if (msg.file.name) {
+                    fileHtml = `<div class="file-chip"><i class="fa-solid fa-file-lines"></i><span>${escapeHtml(msg.file.name)}</span></div>`;
+                }
+            }
+            return `<div class="msg user"><div class="bubble">${fileHtml}${escapeHtml(msg.content)}</div></div>`;
+        }
+
+        function botHtml(msg, idx) {
+            const text = (msg.isAudio && !msg.audioUrl && !msg.content) ? 'Morceau généré (non conservé après rechargement).' : (msg.content || '');
+            const waiting = msg.streaming && !text && !(msg.tools && msg.tools.length) && !(msg.images && msg.images.length) && !msg.musicPending;
+            const body = text ? `<div class="markdown-body">${safeHtml(marked.parse(text))}</div>` : '';
+            const actions = (!msg.streaming && text) ? `<div class="actions"><button type="button" data-act="copy" data-idx="${idx}" aria-label="Copier la réponse"><i class="fa-regular fa-copy"></i></button><button type="button" data-act="speak" data-idx="${idx}" aria-label="Lire à voix haute"><i class="fa-solid fa-volume-high"></i></button></div>` : '';
+            return `<div class="msg bot">
+                <div class="avatar">🐙</div>
+                <div class="bot-body">
+                    ${toolsHtml(msg)}${mediaHtml(msg)}
+                    ${waiting ? '<div class="typing" aria-label="Octopus2 réfléchit"><i></i><i></i><i></i></div>' : ''}
+                    ${body}${sourcesHtml(msg)}${actions}
+                </div>
+            </div>`;
+        }
+
         function renderMessages() {
-            messagesContainer.innerHTML = '';
             const activeChat = chats.find(c => c.id === currentChatId);
-            if (!activeChat) return;
+            if (!activeChat) { messagesContainer.innerHTML = ''; return; }
 
             currentChatTitle.textContent = activeChat.title;
 
-            activeChat.messages.forEach(msg => {
-                const isUser = msg.role === 'user';
-                const msgDiv = document.createElement('div');
-                msgDiv.className = `flex gap-3 max-w-3xl ${isUser ? 'ml-auto flex-row-reverse' : 'mr-auto'}`;
-                
-                let fileHtml = '';
-                const textContent = (msg.isAudio && !msg.audioUrl) ? '🎵 Morceau généré (non conservé après rechargement : relance la génération pour le réécouter).' : msg.content;
-                if (msg.file) {
-                    if (msg.file.type && msg.file.type.startsWith('image/') && msg.file.data) {
-                        fileHtml = `<img src="${msg.file.data}" class="max-w-xs rounded-lg my-2 border border-slate-700 shadow" />`;
-                    } else if (msg.file.text) {
-                        fileHtml = `<div class="text-xs bg-slate-800/80 border border-slate-700 p-2.5 rounded-lg my-1 font-mono text-slate-300 max-h-32 overflow-y-auto custom-scrollbar"><i class="fa-solid fa-file-lines text-indigo-400"></i> <b>${escapeHtml(msg.file.name)}</b><br><pre class="whitespace-pre-wrap mt-1 text-[11px] text-slate-400">${escapeHtml(msg.file.text.slice(0, 300))}${msg.file.text.length > 300 ? '...' : ''}</pre></div>`;
-                    } else {
-                        fileHtml = `<div class="text-xs bg-slate-800 p-2 rounded my-1"><i class="fa-solid fa-paperclip"></i> ${escapeHtml(msg.file.name)}</div>`;
-                    }
-                }
+            // On garde la position de lecture si l'utilisateur a remonté dans la conversation
+            const nearBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < 140;
 
-                if (msg.isAudio && msg.audioUrl) {
-                      msgDiv.innerHTML = `
-                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs bg-slate-800 text-indigo-400 border border-slate-700">🐙</div>
-                        <div class="space-y-1.5 max-w-[85%]">
-                            <div class="p-4 bg-slate-900 border border-indigo-500/40 rounded-2xl max-w-md shadow-xl space-y-3 text-white">
-                                <div class="flex items-center justify-between text-xs font-semibold text-indigo-400 border-b border-slate-800 pb-2">
-                                    <span class="flex items-center gap-1.5">🎵 <span>Maestro Audio Studio</span></span>
-                                    <span class="text-slate-400 text-[10px]">WAV • HD</span>
-                                </div>
-                                <audio controls class="w-full mt-2 rounded-lg bg-slate-950">
-                                    <source src="${msg.audioUrl}" type="audio/wav">
-                                </audio>
-                                <div class="flex items-center justify-end pt-1">
-                                    <a href="${msg.audioUrl}" download="octopus-music.wav" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white transition-colors shadow">
-                                        📥 Télécharger (.wav)
-                                    </a>
-                                </div>
-                            </div>
-                        </div>`;
-                } else {
-                    msgDiv.innerHTML = `
-                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs ${isUser ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-indigo-400 border border-slate-700'}">
-                            ${isUser ? '<i class="fa-solid fa-user"></i>' : '🐙'}
-                        </div>
-                        <div class="space-y-1.5 max-w-[85%]">
-                            <div class="p-3.5 rounded-2xl ${isUser ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-slate-900 border border-slate-800 text-slate-200 rounded-tl-none'} shadow-sm">
-                                ${fileHtml}
-                                <div class="markdown-body">${isUser ? escapeHtml(textContent) : safeHtml(marked.parse(textContent))}</div>
-                            </div>
-                        </div>`;
-                }
-                messagesContainer.appendChild(msgDiv);
-            });
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            if (!activeChat.messages.length) {
+                messagesContainer.innerHTML = welcomeHtml();
+                return;
+            }
+
+            messagesContainer.innerHTML = `<div class="thread">${activeChat.messages.map((m, i) => m.role === 'user' ? userHtml(m) : botHtml(m, i)).join('')}</div>`;
+            if (nearBottom) messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
-        function escapeHtml(text) {
-            if (!text) return '';
-            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        // ---------- Musique ----------
+        async function startMusic(bot, prompt, refresh) {
+            bot.musicPending = true;
+            try {
+                const r = await fetch('/api/music', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt }) });
+                if (r.ok) bot.audios.push(URL.createObjectURL(await r.blob()));
+                else { let e = ''; try { e = (await r.json()).error; } catch (x) {} bot.content += `\n\n⚠️ Musique : ${e || 'génération impossible.'}`; }
+            } catch (e) { bot.content += '\n\n⚠️ Musique : serveur injoignable.'; }
+            bot.musicPending = false;
+            refresh();
+            saveChats();
         }
 
-        // ENVOI À L'API
+        // ---------- Envoi à l'API ----------
         chatForm.onsubmit = async (e) => {
             e.preventDefault();
             const rawText = userInput.value.trim();
@@ -454,7 +663,7 @@
             if (!activeChat.sid) activeChat.sid = newSessionId();
 
             if (activeChat.messages.length === 0) {
-                activeChat.title = rawText ? rawText.slice(0, 25) + '...' : (selectedFileData ? selectedFileData.name : 'Fichier joint');
+                activeChat.title = rawText ? (rawText.length > 32 ? rawText.slice(0, 32) + '…' : rawText) : (selectedFileData ? selectedFileData.name : 'Fichier joint');
             }
 
             let fullTextPrompt = rawText || 'Analyse ce fichier joint.';
@@ -462,53 +671,46 @@
                 fullTextPrompt += `\n\n[CONTENU DU FICHIER "${selectedFileData.name}"]:\n${selectedFileData.text}`;
             }
 
-            const userMsg = { role: 'user', content: rawText || `[Fichier : ${selectedFileData.name}]`, file: selectedFileData };
-            activeChat.messages.push(userMsg);
-            
+            activeChat.messages.push({ role: 'user', content: rawText || `[Fichier : ${selectedFileData.name}]`, file: selectedFileData });
+
             userInput.value = '';
             userInput.style.height = 'auto';
             const attachedFile = selectedFileData;
             selectedFileData = null;
             fileInput.value = '';
             filePreviewContainer.classList.add('hidden');
+            updateSendState();
 
             saveChats();
             renderSidebar();
-            renderMessages();
 
-            const loadingDiv = document.createElement('div');
-            loadingDiv.className = 'flex gap-3 mr-auto items-center text-xs text-slate-400';
-            loadingDiv.innerHTML = `<div class="w-8 h-8 rounded-full bg-slate-800 text-indigo-400 flex items-center justify-center">🐙</div> <i class="fa-solid fa-spinner fa-spin"></i> Traitement par l'IA...`;
-            messagesContainer.appendChild(loadingDiv);
+            // Message de réponse créé tout de suite : l'indicateur de réflexion s'affiche aussitôt
+            const bot = { role: 'bot', content: '', tools: [], images: [], sources: [], audios: [], streaming: true };
+            activeChat.messages.push(bot);
+            renderMessages();
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
-            const isAudioMode = modeSelect.value === 'music';
+            let pending = false;
+            const refresh = () => {
+                if (pending) return;
+                pending = true;
+                requestAnimationFrame(() => { pending = false; if (currentChatId === activeChat.id) renderMessages(); });
+            };
+            const fail = (text) => { bot.content += (bot.content ? '\n\n' : '') + text; };
 
             try {
-                if (isAudioMode) {
-                    const musicRes = await fetch('/api/music', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt: fullTextPrompt || "Musique agréable" })
-                    });
-
-                    loadingDiv.remove();
-
-                    if (musicRes.ok) {
-                        const blob = await musicRes.blob();
-                        const audioUrl = URL.createObjectURL(blob);
-                        activeChat.messages.push({ role: 'bot', content: 'Génération musicale terminée.', isAudio: true, audioUrl: audioUrl });
-                    } else {
-                        let errText = '';
-                        try { errText = (await musicRes.json()).error; } catch (e) {}
-                        activeChat.messages.push({ role: 'bot', content: `⚠️ Erreur Musique: ${errText || 'Impossible de générer le morceau.'}` });
-                    }
+                if (modeSelect.value === 'music') {
+                    bot.content = 'Je compose ton morceau.';
+                    await startMusic(bot, fullTextPrompt || 'Musique agréable', refresh);
                 } else {
                     // On n'envoie ni les erreurs ni les messages audio ; le dernier message contient le texte du fichier joint
-                    const historyToSend = activeChat.messages.filter(m => !(m.role === 'bot' && (m.isAudio || String(m.content).startsWith('⚠️'))));
-                    const cleanMessagesHistory = historyToSend.map((m, i, arr) => ({
+                    const history = activeChat.messages
+                        .filter(m => m !== bot)
+                        .filter(m => !(m.role === 'bot' && (m.isAudio || String(m.content).startsWith('⚠️'))))
+                        .filter(m => m.role === 'user' || m.content || (m.images && m.images.length));
+                    const payloadMessages = history.map((m, i, arr) => ({
                         role: m.role === 'bot' ? 'assistant' : 'user',
-                        content: i === arr.length - 1 ? fullTextPrompt : m.content
+                        content: i === arr.length - 1 ? fullTextPrompt : (m.content || '(image générée)')
                     }));
 
                     const response = await fetch('/api/chat', {
@@ -516,27 +718,52 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             sessionId: activeChat.sid,
-                            messages: cleanMessagesHistory,
+                            messages: payloadMessages,
                             mode: modeSelect.value,
                             webSearch: isWebSearchActive,
                             file: attachedFile ? { name: attachedFile.name, type: attachedFile.type, data: attachedFile.data, text: attachedFile.text } : null
                         })
                     });
 
-                    const data = await response.json().catch(() => ({}));
-                    loadingDiv.remove();
-
-                    if (response.ok && data.reply) {
-                        activeChat.messages.push({ role: 'bot', content: data.reply });
+                    const ctype = response.headers.get('content-type') || '';
+                    if (!response.ok || !ctype.includes('ndjson')) {
+                        const data = await response.json().catch(() => ({}));
+                        fail(`⚠️ Erreur API : ${data.error || data.message || ('Erreur HTTP ' + response.status)}`);
                     } else {
-                        activeChat.messages.push({ role: 'bot', content: `⚠️ Erreur API : ${data.error || data.message || ('Erreur HTTP ' + response.status)}` });
+                        const handleEvent = (ev) => {
+                            if (ev.t === 'delta') bot.content += ev.text;
+                            else if (ev.t === 'tool') bot.tools.push({ id: ev.id, name: ev.name, label: ev.label, done: false });
+                            else if (ev.t === 'tool_done') { const t = bot.tools.find(x => x.id === ev.id); if (t) { t.done = true; t.ok = ev.ok; } }
+                            else if (ev.t === 'sources') bot.sources = (bot.sources || []).concat(ev.items || []);
+                            else if (ev.t === 'image') bot.images.push(ev.url);
+                            else if (ev.t === 'music') startMusic(bot, ev.prompt, refresh);
+                            else if (ev.t === 'error') fail(`⚠️ ${ev.message}`);
+                            refresh();
+                        };
+
+                        const reader = response.body.getReader();
+                        const decoder = new TextDecoder();
+                        let buf = '';
+                        while (true) {
+                            const { done, value } = await reader.read();
+                            if (done) break;
+                            buf += decoder.decode(value, { stream: true });
+                            let nl;
+                            while ((nl = buf.indexOf('\n')) >= 0) {
+                                const line = buf.slice(0, nl).trim();
+                                buf = buf.slice(nl + 1);
+                                if (line) { try { handleEvent(JSON.parse(line)); } catch (err) { /* ligne invalide ignorée */ } }
+                            }
+                        }
+                        if (buf.trim()) { try { handleEvent(JSON.parse(buf)); } catch (err) {} }
                     }
                 }
             } catch (err) {
-                loadingDiv.remove();
-                activeChat.messages.push({ role: 'bot', content: '⚠️ Impossible de contacter le serveur backend.' });
+                fail('⚠️ Impossible de contacter le serveur backend.');
             }
 
+            bot.streaming = false;
+            if (!bot.content && !bot.images.length && !bot.musicPending && !bot.audios.length) bot.content = '⚠️ Réponse vide, réessaie.';
             saveChats();
             renderMessages();
         };
